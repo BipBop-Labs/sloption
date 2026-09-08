@@ -63,7 +63,7 @@ export default function Settings({
     >
       <header className="dialog-header">
         <h2>Configuración</h2>
-        <button onClick={close} aria-label="Cerrar configuración">
+        <button className="dialog-close" onClick={close} aria-label="Cerrar configuración">
           ×
         </button>
       </header>

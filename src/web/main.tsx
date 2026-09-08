@@ -32,6 +32,8 @@ import {
   type BoardData,
 } from "./api";
 import { Chip, chipColor, DropdownSelect } from "./dropdown";
+import { ConfirmProvider, useConfirm } from "./confirm";
+import { Icon } from "./icon";
 import "./styles.css";
 const DocumentEditor = lazy(() => import("./editor"));
 const Settings = lazy(() => import("./settings"));
@@ -382,6 +384,7 @@ function BoardPage() {
           open={open}
           update={update}
           onError={showError}
+          isAdmin={me.data?.role === "admin"}
         />
       )}
       {search.card && detail.data && board.data && (
@@ -441,13 +444,39 @@ function Board({
   open,
   update,
   onError,
+  isAdmin,
 }: {
   data: BoardData;
   view: string;
   open(id: string): void;
   update: Update;
   onError(message: string): void;
+  isAdmin: boolean;
 }) {
+  const confirm = useConfirm();
+  const [newStage, setNewStage] = useState("");
+  /** Las columnas son las opciones del campo de agrupación: agregar y quitar
+   *  una etapa es una sola acción, field.update, que además limpia el valor en
+   *  las tarjetas que la usaban. */
+  async function saveStages(
+    options: { id: string; label: string }[],
+  ): Promise<void> {
+    if (!grouping) return;
+    try {
+      await action("field.update", {
+        id: grouping.id,
+        name: grouping.name,
+        options,
+      });
+      refresh();
+    } catch (error) {
+      onError(errorMessage(error));
+    }
+  }
+  // setDrop tiene identidad estable, así que CardTile sigue memoizado.
+  const [drop, setDrop] = useState<(DropTarget & { height: number }) | null>(
+    null,
+  );
   const grouping = data.fields.find(
     (field) => field.id === data.board.groupingId,
   );
@@ -461,6 +490,11 @@ function Board({
         const cards = data.cards.filter(
           (card) => (card.values[data.board.groupingId] ?? "") === option.id,
         );
+        // "" = al final de la columna; un id = justo antes de esa tarjeta.
+        const slot =
+          drop && (drop.optionId ?? "") === option.id
+            ? (drop.beforeId ?? "")
+            : null;
         return (
           <section className="column" key={option.id} data-option={option.id}>
             <header className="column-header">
@@ -470,18 +504,51 @@ function Board({
                 </Chip>
               </h2>
               <span>{cards.length}</span>
+              {isAdmin && option.id && (
+                <button
+                  className="stage-remove"
+                  aria-label={`Eliminar etapa ${option.label}`}
+                  onClick={async () => {
+                    if (
+                      await confirm({
+                        title: `¿Eliminar la etapa "${option.label}"?`,
+                        message: cards.length
+                          ? `${cards.length} tarjeta(s) quedarán sin estado. No se borra ninguna.`
+                          : "La columna desaparece del tablero.",
+                        confirmLabel: "Eliminar etapa",
+                        destructive: true,
+                      })
+                    )
+                      void saveStages(
+                        (grouping?.options ?? []).filter(
+                          (item) => item.id !== option.id,
+                        ),
+                      );
+                  }}
+                >
+                  <Icon name="trash" />
+                </button>
+              )}
             </header>
             <div className="cards">
               {cards.map((card) => (
-                <CardTile
-                  key={card.id}
-                  card={card}
-                  fields={data.fields}
-                  profiles={data.profiles}
-                  open={open}
-                  update={update}
-                />
+                <React.Fragment key={card.id}>
+                  {slot === card.id && (
+                    <div className="drop-slot" style={{ height: drop!.height }} />
+                  )}
+                  <CardTile
+                    card={card}
+                    fields={data.fields}
+                    profiles={data.profiles}
+                    open={open}
+                    update={update}
+                    preview={setDrop}
+                  />
+                </React.Fragment>
               ))}
+              {slot === "" && (
+                <div className="drop-slot" style={{ height: drop!.height }} />
+              )}
             </div>
             {view !== "archived" && (
               <form
@@ -494,13 +561,15 @@ function Board({
                   ).trim();
                   if (!title) return;
                   try {
-                    await action("card.create", {
+                    const created = await action<Card>("card.create", {
                       title,
                       values: { [data.board.groupingId]: option.id || null },
                       weekly: view === "week",
                     });
                     form.reset();
                     refresh();
+                    // Crear es el principio de escribir la tarjeta, no el final.
+                    open(created.id);
                   } catch (error) {
                     onError(errorMessage(error));
                   }
@@ -520,8 +589,63 @@ function Board({
           </section>
         );
       })}
+      {isAdmin && grouping && (
+        <form
+          className="column add-stage"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const label = newStage.trim();
+            if (!label) return;
+            setNewStage("");
+            void saveStages([
+              ...(grouping.options ?? []),
+              { id: crypto.randomUUID(), label },
+            ]);
+          }}
+        >
+          <input
+            value={newStage}
+            onChange={(event) => setNewStage(event.target.value)}
+            aria-label="Nombre de la nueva etapa"
+            placeholder="Nueva etapa"
+            required
+          />
+          <button aria-label="Agregar etapa">
+            <Icon name="plus" />
+            Agregar
+          </button>
+        </form>
+      )}
     </div>
   );
+}
+type DropTarget = { optionId: string | null; beforeId: string | null };
+/** Dónde caería la tarjeta.
+ *
+ *  El hueco desplaza a las vecinas, así que cambia lo que hay bajo el cursor.
+ *  Si además cambiara el destino, el hueco se movería, el layout volvería atrás
+ *  y el resultado parpadearía. Por eso el cursor sobre el hueco significa "ya
+ *  estás en el destino" y conserva el actual: ahí se corta el ciclo. */
+function dropTargetAt(
+  x: number,
+  y: number,
+  dragged: HTMLElement | null,
+  current: DropTarget | null,
+): DropTarget | null {
+  const target = document
+    .elementsFromPoint(x, y)
+    .find(
+      (element) =>
+        !dragged?.contains(element) && element.closest("[data-option]"),
+    );
+  if (target?.closest(".drop-slot")) return current;
+  const column = target?.closest<HTMLElement>("[data-option]");
+  if (!column) return null;
+  return {
+    optionId: column.dataset.option || null,
+    beforeId:
+      target?.closest<HTMLElement>("[data-card-id]")?.dataset.cardId ?? null,
+  };
 }
 const CardTile = memo(function CardTile({
   card,
@@ -529,12 +653,14 @@ const CardTile = memo(function CardTile({
   profiles,
   open,
   update,
+  preview,
 }: {
   card: Card;
   fields: Field[];
   profiles: Profile[];
   open(id: string): void;
   update: Update;
+  preview(drop: (DropTarget & { height: number }) | null): void;
 }) {
   const node = useRef<HTMLElement>(null);
   const gesture = useRef<{
@@ -544,6 +670,8 @@ const CardTile = memo(function CardTile({
     timer?: ReturnType<typeof setTimeout>;
     moved: boolean;
     touch: boolean;
+    height?: number;
+    drop?: DropTarget | null;
   } | null>(null);
   const prefetch = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const priority = fields.find((field) => field.id === "priority");
@@ -562,11 +690,36 @@ const CardTile = memo(function CardTile({
     gesture.current = state;
     if (state.touch)
       state.timer = setTimeout(() => {
-        state.active = true;
-        node.current?.setPointerCapture(event.pointerId);
+        lift(event.pointerId);
         navigator.vibrate?.(15);
       }, 200);
     void queryClient.prefetchQuery(cardQuery(card.id));
+  }
+  /** Saca la tarjeta del flujo: su hueco desaparece y el único espacio que
+   *  queda abierto es el del destino. */
+  function lift(pointerId: number) {
+    const state = gesture.current;
+    const element = node.current;
+    if (!state || !element || state.active) return;
+    state.active = true;
+    const rect = element.getBoundingClientRect();
+    state.height = rect.height;
+    element.style.position = "fixed";
+    element.style.left = `${rect.left}px`;
+    element.style.top = `${rect.top}px`;
+    element.style.width = `${rect.width}px`;
+    element.classList.add("dragging");
+    element.setPointerCapture(pointerId);
+  }
+  /** Devuelve la tarjeta al flujo y borra la vista previa del hueco. */
+  function drop(wasActive: boolean) {
+    const element = node.current;
+    if (element) {
+      for (const property of ["position", "left", "top", "width", "transform"])
+        element.style.removeProperty(property);
+      element.classList.remove("dragging");
+    }
+    if (wasActive) preview(null);
   }
   function move(event: React.PointerEvent<HTMLElement>) {
     const state = gesture.current;
@@ -574,14 +727,24 @@ const CardTile = memo(function CardTile({
     const dx = event.clientX - state.x,
       dy = event.clientY - state.y;
     if (Math.hypot(dx, dy) > 6) state.moved = true;
-    if (!state.touch && state.moved) {
-      state.active = true;
-      node.current?.setPointerCapture(event.pointerId);
-    }
+    if (!state.touch && state.moved) lift(event.pointerId);
     if (state.touch && !state.active && state.moved) clearTimeout(state.timer);
     if (state.active && node.current) {
       node.current.style.transform = `translate(${dx}px,${dy}px)`;
-      node.current.classList.add("dragging");
+      const target = dropTargetAt(
+        event.clientX,
+        event.clientY,
+        node.current,
+        state.drop ?? null,
+      );
+      // Solo re-renderiza cuando el destino cambia, no en cada pointermove.
+      if (
+        target?.optionId !== state.drop?.optionId ||
+        target?.beforeId !== state.drop?.beforeId
+      ) {
+        state.drop = target;
+        preview(target && { ...target, height: state.height ?? 0 });
+      }
     }
   }
   function end(event: React.PointerEvent<HTMLElement>) {
@@ -589,26 +752,12 @@ const CardTile = memo(function CardTile({
     gesture.current = null;
     if (!state) return;
     clearTimeout(state.timer);
-    if (node.current) {
-      node.current.style.transform = "";
-      node.current.classList.remove("dragging");
-    }
+    // Suelta en el hueco que se mostró, no en un hit-test nuevo: lo que viste
+    // es lo que pasa.
+    const target = state.drop ?? null;
+    drop(state.active);
     if (state.active && state.moved) {
-      const target = document
-        .elementsFromPoint(event.clientX, event.clientY)
-        .find(
-          (element) =>
-            !node.current?.contains(element) &&
-            element.closest("[data-option]"),
-        );
-      const column = target?.closest<HTMLElement>("[data-option]");
-      const before = target?.closest<HTMLElement>("[data-card-id]");
-      if (column)
-        void update("card.move", {
-          id: card.id,
-          optionId: column.dataset.option || null,
-          beforeId: before?.dataset.cardId ?? null,
-        });
+      if (target) void update("card.move", { id: card.id, ...target });
     } else if (
       state.touch &&
       Math.abs(event.clientX - state.x) > 70 &&
@@ -679,12 +828,10 @@ const CardTile = memo(function CardTile({
       onPointerMove={move}
       onPointerUp={end}
       onPointerCancel={() => {
-        if (gesture.current) clearTimeout(gesture.current.timer);
+        const state = gesture.current;
         gesture.current = null;
-        if (node.current) {
-          node.current.style.transform = "";
-          node.current.classList.remove("dragging");
-        }
+        if (state) clearTimeout(state.timer);
+        drop(!!state?.active);
       }}
       onPointerEnter={() => {
         prefetch.current = setTimeout(() => {
@@ -715,23 +862,7 @@ const CardTile = memo(function CardTile({
               );
             })}
         </span>
-        <button
-          className={card.weekly ? "chip week-mark marked" : "chip week-mark"}
-          aria-label={
-            card.weekly ? "Quitar de esta semana" : "Marcar esta semana"
-          }
-          aria-pressed={card.weekly}
-          onClick={(event) => {
-            event.stopPropagation();
-            void update(
-              "card.week",
-              { id: card.id, weekly: !card.weekly },
-              { weekly: !card.weekly },
-            );
-          }}
-        >
-          Esta semana
-        </button>
+        {card.weekly && <span className="chip chip-week">Esta semana</span>}
       </div>
     </article>
   );
@@ -821,6 +952,7 @@ function CardDialog({
   onError(message: string): void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const confirm = useConfirm();
   const [title, setTitle] = useState(card.title);
   const [weekly, setWeekly] = useState(card.weekly);
   const [documentPending, setDocumentPending] = useState(false);
@@ -850,36 +982,50 @@ function CardDialog({
       }}
     >
       <header className="dialog-header">
-        <span>TARJETA</span>
         <button
-          onClick={() => {
+          className="dialog-close"
+          onClick={requestClose}
+          aria-label="Cerrar tarjeta"
+        >
+          »
+        </button>
+        <input
+          className="card-title"
+          aria-label="Título"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          onBlur={() => {
+            if (title !== card.title)
+              void update("card.update", {
+                id: card.id,
+                version: card.version,
+                title,
+              });
+          }}
+        />
+        <button
+          onClick={async () => {
+            const archiving = !card.archived;
+            if (
+              archiving &&
+              !(await confirm({
+                title: "¿Archivar esta tarjeta?",
+                message: "Sale del tablero. Puedes restaurarla desde Archivadas.",
+                confirmLabel: "Archivar",
+              }))
+            )
+              return;
             void update(
               "card.archive",
-              { id: card.id, archived: !card.archived },
-              { archived: !card.archived },
+              { id: card.id, archived: archiving },
+              { archived: archiving },
             );
           }}
         >
+          <Icon name={card.archived ? "restore" : "archive"} />
           {card.archived ? "Restaurar" : "Archivar"}
         </button>
-        <button onClick={requestClose} aria-label="Cerrar tarjeta">
-          ×
-        </button>
       </header>
-      <input
-        className="card-title"
-        aria-label="Título"
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        onBlur={() => {
-          if (title !== card.title)
-            void update("card.update", {
-              id: card.id,
-              version: card.version,
-              title,
-            });
-        }}
-      />
       <div className="property-row">
         <span>Planificación</span>
         <button
@@ -964,6 +1110,8 @@ declare module "@tanstack/react-router" {
 }
 createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={queryClient}>
-    <RouterProvider router={router} />
+    <ConfirmProvider>
+      <RouterProvider router={router} />
+    </ConfirmProvider>
   </QueryClientProvider>,
 );

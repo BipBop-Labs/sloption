@@ -1,0 +1,52 @@
+import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+// No necesita servidor ni base: monta las reglas reales sobre una columna.
+// Cubre las dos cosas que pueden romperse en silencio en el hueco de destino:
+// que ocupe espacio real (las vecinas se corren) y que el hit-test lo vea. Lo
+// segundo es lo que corta el ciclo de parpadeo: si el hueco fuera invisible al
+// hit-test, el cursor caería en la columna, el destino saltaría al final y el
+// layout oscilaría.
+test("el hueco de destino abre espacio y es visible al hit-test", async ({
+  page,
+}) => {
+  const css = readFileSync("src/web/styles.css", "utf8");
+  await page.setContent(
+    `<style>${css}</style>
+     <section class="column" data-option="qa" style="width:280px">
+       <div class="cards">
+         <article class="card" data-card-id="a"><h3>A</h3></article>
+         <article class="card" data-card-id="b"><h3>B</h3></article>
+       </div>
+     </section>`,
+  );
+  const b = page.locator('[data-card-id="b"]');
+  const before = (await b.boundingBox())!;
+
+  const height = 96;
+  await page.locator(".cards").evaluate((list, h) => {
+    const slot = document.createElement("div");
+    slot.className = "drop-slot";
+    slot.style.height = `${h}px`;
+    list.insertBefore(slot, list.children[1]!);
+  }, height);
+
+  // La vecina se corre: el hueco más el gap de 8px de .cards.
+  const after = (await b.boundingBox())!;
+  expect(Math.round(after.y - before.y)).toBe(height + 8);
+
+  const slot = page.locator(".drop-slot");
+  await expect(slot).toHaveCSS("border-top-style", "dashed");
+
+  // El hit-test tiene que encontrar el hueco, no atravesarlo.
+  const box = (await slot.boundingBox())!;
+  const hit = await page.evaluate(
+    ([x, y]) =>
+      document
+        .elementsFromPoint(x, y)
+        .map((element) => element.className)
+        .join(" "),
+    [box.x + box.width / 2, box.y + box.height / 2] as [number, number],
+  );
+  expect(hit).toContain("drop-slot");
+});

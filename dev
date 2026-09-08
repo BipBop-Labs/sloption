@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Levanta backend (docker) + frontend (vite local). Ver CODE.md.
+set -euo pipefail
+cd "$(dirname "$0")"
+
+case "${1:-start}" in
+  start)
+    docker compose -f docker-compose.dev.yml up -d --build
+    exec pnpm run dev
+    ;;
+  stop)
+    docker compose -f docker-compose.dev.yml down
+    ;;
+  *)
+    echo "uso: ./dev [start|stop]" >&2
+    exit 1
+    ;;
+esac

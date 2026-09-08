@@ -11,6 +11,7 @@
   --primary-foreground: #fafafa;
   --accent: #f4f4f5;
   --ring: #a1a1aa;
+  --info: #087f93;
   --danger: #b91c1c;
   --week-bg: #fef3c7;
   --week-fg: #92400e;
@@ -51,6 +52,7 @@
   --primary-foreground: #18181b;
   --accent: #27272a;
   --ring: #71717a;
+  --info: #56d6e7;
   --danger: #f87171;
   --week-bg: #422b0a;
   --week-fg: #fcd34d;
@@ -325,8 +327,15 @@ label input {
   content-visibility: auto;
   contain-intrinsic-size: auto 132px;
 }
-.card:hover {
-  border-color: var(--input);
+.card:hover,
+.card:focus-visible {
+  border-color: var(--info);
+}
+/* La tarjeta es role="button" y heredaría el anillo gris genérico. Lo funde con
+   su propio borde: un solo filo cian, sin perder indicador de foco. */
+.card:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -1px;
 }
 .card:focus-within {
   content-visibility: visible;
@@ -434,6 +443,12 @@ button.week-mark:hover {
   will-change: transform;
   box-shadow: var(--shadow-popover);
   user-select: none;
+  cursor: grabbing;
+}
+.drop-slot {
+  border: 1px dashed var(--info);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--info) 8%, transparent);
 }
 .new-card {
   display: flex;
@@ -475,6 +490,22 @@ dialog {
   padding: 0;
   overflow: auto;
   box-shadow: var(--shadow-drawer);
+  /* Entra y sale deslizando. display y overlay necesitan allow-discrete para
+     que el cierre se vea: si no, el dialog desaparece antes de animar.
+     El bloque de prefers-reduced-motion ya anula estas transiciones. */
+  translate: 100% 0;
+  transition:
+    translate 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+    display 0.22s allow-discrete,
+    overlay 0.22s allow-discrete;
+}
+.card-dialog.drawer[open] {
+  translate: 0 0;
+}
+@starting-style {
+  .card-dialog.drawer[open] {
+    translate: 100% 0;
+  }
 }
 .settings-dialog {
   border: 1px solid var(--border);
@@ -509,24 +540,42 @@ dialog {
   letter-spacing: 0.05em;
   color: var(--muted-foreground);
 }
-.dialog-header > button:last-child {
+/* Se estiliza por lo que el botón es, no por dónde cae: como :last-child,
+   cualquier botón agregado al final heredaba el aspecto del de cerrar. */
+.dialog-header > .dialog-close {
   border: 0;
   box-shadow: none;
-  font-size: 20px;
-  padding: 4px 10px;
-}
-.card-title {
-  display: block;
-  border: 0;
-  box-shadow: none;
-  width: 100%;
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: -0.025em;
-  margin: 14px 0;
-  padding: 16px 24px;
-  min-height: 76px;
   background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 10px;
+  color: var(--muted-foreground);
+}
+.dialog-header > .dialog-close:hover {
+  color: var(--foreground);
+}
+/* El título vive en la cabecera pegajosa: sigue visible al hacer scroll y
+   se sigue editando ahí mismo. */
+.card-title {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  box-shadow: none;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.card-title:hover {
+  background: var(--muted);
+}
+.card-title:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -1px;
+  background: var(--muted);
 }
 .property-row {
   display: grid;
@@ -750,6 +799,19 @@ dialog {
 }
 dialog::backdrop {
   background: var(--overlay);
+  opacity: 0;
+  transition:
+    opacity 0.22s ease,
+    display 0.22s allow-discrete,
+    overlay 0.22s allow-discrete;
+}
+dialog[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
 }
 .skip-link {
   position: absolute;
@@ -956,4 +1018,76 @@ dialog::backdrop {
   .board-heading h1 {
     font-size: 24px;
   }
+}
+
+/* ---------- iconos ---------- */
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+button > .icon:not(:only-child) {
+  margin-right: 6px;
+}
+
+
+/* ---------- etapas ---------- */
+.stage-remove {
+  border: 0;
+  background: transparent;
+  padding: 4px;
+  color: var(--muted-foreground);
+  font-size: 16px;
+}
+.stage-remove:hover {
+  color: var(--danger);
+}
+.add-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: start;
+  background: transparent;
+  border: 1px dashed var(--input);
+  padding: 12px;
+}
+.add-stage input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 8px 10px;
+  font: inherit;
+}
+.add-stage button {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---------- confirmación ---------- */
+.confirm-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 20px;
+  width: calc(100% - 32px);
+  max-width: 420px;
+  margin: auto;
+  box-shadow: var(--shadow-popover);
+}
+.confirm-dialog h2 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.confirm-dialog p {
+  color: var(--muted-foreground);
+  margin-bottom: 20px;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
