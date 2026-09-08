@@ -1,27 +1,8 @@
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { useRef, useState } from "react";
+import { Chip, chipColor } from "./Chip";
 
 export type Choice = { id: string; label: string };
-export function chipColor(id: string) {
-  let hash = 0;
-  for (const letter of id) hash = (hash * 31 + letter.charCodeAt(0)) | 0;
-  return Math.abs(hash) % 6;
-}
-export function Chip({
-  children,
-  color,
-  weekly = false,
-}: {
-  children: React.ReactNode;
-  color?: number;
-  weekly?: boolean;
-}) {
-  return (
-    <span className={`chip${weekly ? " chip-week" : ""}`} data-color={color}>
-      {children}
-    </span>
-  );
-}
 export function DropdownSelect({
   label,
   value,
@@ -32,6 +13,7 @@ export function DropdownSelect({
   name,
   placeholder = "Sin asignar",
   clearable = false,
+  prefix,
 }: {
   label: string;
   value?: string | string[];
@@ -42,6 +24,9 @@ export function DropdownSelect({
   name?: string;
   placeholder?: string;
   clearable?: boolean;
+  /** Texto fijo dentro del disparador. En una barra de filtros hace falta para
+   *  saber qué campo filtra cada control, no solo el valor elegido. */
+  prefix?: string;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -78,6 +63,7 @@ export function DropdownSelect({
           className="dropdown-trigger"
           aria-label={label}
         >
+          {prefix && <span className="dropdown-prefix">{prefix}</span>}
           <span className="selected-chips">
             {ids.length ? (
               ids.map((id) => (

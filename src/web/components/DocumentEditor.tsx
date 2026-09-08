@@ -4,8 +4,9 @@ import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Collaboration from "@tiptap/extension-collaboration";
 import * as Y from "yjs";
-import { action, errorMessage, queryClient } from "./api";
-import type { Card } from "../core/model";
+import { action, errorMessage, queryClient } from "../api";
+import type { Card } from "../../core/model";
+import { FilePicker } from "../ui";
 
 const decode = (value: string) =>
   Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
@@ -158,18 +159,12 @@ export default function DocumentEditor({
         >
           Lista numerada
         </button>
-        <label className="button">
+        <FilePicker
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          onPick={(file) => void upload(file)}
+        >
           Imagen
-          <input
-            className="sr-only"
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void upload(file);
-            }}
-          />
-        </label>
+        </FilePicker>
         <span aria-live="polite">{pending ? "Guardando…" : "Guardado"}</span>
         {failed && (
           <button onClick={() => saveRef.current()}>Reintentar</button>

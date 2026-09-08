@@ -219,6 +219,7 @@ for (const [index, row] of rows.entries()) {
     values,
     weekly: row.Weekly === "esta semana",
     archived: false,
+    archivedStage: null,
     rank: (index + 1) * 1024,
     version: 1,
     createdAt: new Date().toISOString(),

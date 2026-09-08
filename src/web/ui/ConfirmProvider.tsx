@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Button } from "./Button";
 
 export interface ConfirmOptions {
   title: string;
@@ -13,6 +14,9 @@ export interface ConfirmOptions {
   confirmLabel: string;
   /** Pinta el botón como destructivo y le da el foco al de cancelar. */
   destructive?: boolean;
+  /** Texto que hay que escribir para habilitar el botón. Para lo que se
+   *  borra y arrastra datos con él: obliga a leer qué se está borrando. */
+  challenge?: string;
 }
 
 /** Pregunta y espera la respuesta. Devuelve false si se cancela o se cierra. */
@@ -28,6 +32,7 @@ export function useConfirm(): Ask {
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
+  const [typed, setTyped] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const settle = useRef<((confirmed: boolean) => void) | null>(null);
 
@@ -37,6 +42,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         // Si ya había una pregunta abierta, la anterior se cancela.
         settle.current?.(false);
         settle.current = resolve;
+        setTyped("");
         setOptions(next);
       }),
     [],
@@ -70,16 +76,35 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         >
           <h2 id="confirm-title">{options.title}</h2>
           {options.message && <p>{options.message}</p>}
+          {options.challenge && (
+            <input
+              autoFocus
+              value={typed}
+              aria-label={`Escribe "${options.challenge}" para confirmar`}
+              placeholder={options.challenge}
+              onChange={(event) => setTyped(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && typed.trim() === options.challenge)
+                  answer(true);
+              }}
+            />
+          )}
           <div className="confirm-actions">
-            <button onClick={() => answer(false)} autoFocus>
+            <Button
+              onClick={() => answer(false)}
+              autoFocus={!options.challenge}
+            >
               Cancelar
-            </button>
-            <button
-              className={options.destructive ? "danger" : "primary"}
+            </Button>
+            <Button
+              variant={options.destructive ? "danger" : "primary"}
+              disabled={
+                !!options.challenge && typed.trim() !== options.challenge
+              }
               onClick={() => answer(true)}
             >
               {options.confirmLabel}
-            </button>
+            </Button>
           </div>
         </dialog>
       )}

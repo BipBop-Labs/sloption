@@ -40,6 +40,7 @@ const cardSchema = z
     values,
     weekly: z.boolean(),
     archived: z.boolean(),
+    archivedStage: z.string().nullable().default(null),
     rank: z.number(),
     version: z.number().int(),
     createdAt: z.string(),
@@ -300,6 +301,7 @@ export function createService(deps: {
         markdown: "",
         document: null,
         archived: false,
+        archivedStage: null,
         rank: Math.max(0, ...cards.map((card) => card.rank)) + 1024,
         version: 1,
         createdAt: now,
@@ -356,6 +358,23 @@ export function createService(deps: {
     true,
     async (input, _actor, tx) => {
       const card = await requireEntity(tx, "cards", input.id);
+      const board = await requireEntity(tx, "boards", "main");
+      const field = await tx.get("fields", board.groupingId);
+      // Archivada, la etapa deja de ser un valor del campo que agrupa y pasa a
+      // ser una etiqueta copiada: la tarjeta no referencia ninguna columna, así
+      // que borrar una columna no la toca ni queda bloqueado por el archivo.
+      if (input.archived) {
+        const current = card.values[board.groupingId];
+        card.archivedStage =
+          field?.options.find((option) => option.id === current)?.label ?? null;
+        card.values[board.groupingId] = null;
+      } else {
+        // Al restaurar vuelve a su etapa si todavía existe con ese nombre.
+        card.values[board.groupingId] =
+          field?.options.find((option) => option.label === card.archivedStage)
+            ?.id ?? null;
+        card.archivedStage = null;
+      }
       card.archived = input.archived;
       return saveCard(tx, card);
     },

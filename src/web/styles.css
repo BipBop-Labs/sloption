@@ -299,6 +299,13 @@ label input {
   z-index: 1;
   min-height: 44px;
 }
+.column-header.draggable {
+  cursor: grab;
+  touch-action: pan-y;
+}
+.column.dragging {
+  cursor: grabbing;
+}
 .column-header h2 {
   font-size: 12px;
   flex: 1;
@@ -1030,7 +1037,6 @@ button > .icon:not(:only-child) {
   margin-right: 6px;
 }
 
-
 /* ---------- etapas ---------- */
 .stage-remove {
   border: 0;
@@ -1086,8 +1092,148 @@ button > .icon:not(:only-child) {
   color: var(--muted-foreground);
   margin-bottom: 20px;
 }
+.confirm-dialog input {
+  width: 100%;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 8px 10px;
+  font: inherit;
+  margin-bottom: 20px;
+}
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* ---------- filtros ---------- */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+.filter-search {
+  min-width: 180px;
+  flex: 0 1 240px;
+  min-height: 36px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 6px 10px;
+}
+.filter-search:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -1px;
+}
+.filters .dropdown-field {
+  flex: 0 0 auto;
+}
+.dropdown-prefix {
+  flex: none;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.dropdown-prefix::after {
+  content: ":";
+}
+.filter-clear {
+  min-height: 36px;
+  color: var(--muted-foreground);
+}
+.filter-count {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+.filter-count::before {
+  content: "·";
+  margin-right: 6px;
+}
+@media (min-width: 768px) {
+  .filters {
+    padding: 0 28px 20px;
+  }
+}
+@media (min-width: 1100px) {
+  .filters {
+    padding: 0 40px 20px;
+  }
+}
+
+/* Lista de "Todas": filas plegadas en grupos, al estilo Notion. */
+.list {
+  padding: 0 16px 24px;
+  min-height: 70vh;
+}
+.list-group + .list-group {
+  margin-top: 24px;
+}
+.list-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  min-height: 44px;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  background: var(--background);
+  z-index: 1;
+}
+.list-group > summary::before {
+  content: "\25b8";
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.list-group[open] > summary::before {
+  content: "\25be";
+}
+.list-group > summary > span:last-child {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  min-height: 44px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.row:first-of-type {
+  border-top: 1px solid var(--border);
+}
+.row:hover {
+  background: var(--muted);
+}
+.row-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row .avatars {
+  margin-left: 0;
+}
+.row-empty {
+  padding: 12px 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.list-group .new-card {
+  padding: 0 12px;
 }

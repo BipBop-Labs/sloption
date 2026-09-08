@@ -23,6 +23,8 @@ export interface Card {
   values: Record<string, Value>;
   weekly: boolean;
   archived: boolean;
+  /** Etiqueta de la etapa al archivar. Copia, no referencia a la opción. */
+  archivedStage: string | null;
   rank: number;
   version: number;
   createdAt: string;

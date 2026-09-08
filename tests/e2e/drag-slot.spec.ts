@@ -50,3 +50,49 @@ test("el hueco de destino abre espacio y es visible al hit-test", async ({
   );
   expect(hit).toContain("drop-slot");
 });
+
+// Lo mismo para las columnas: el hueco entre columnas tiene que empujar a la
+// vecina y ser visible al hit-test. Cuelga del tablero, no de .cards, así que
+// columnDropAt lo reconoce por su clase y no por la columna que lo contiene.
+test("el hueco entre columnas abre espacio y es visible al hit-test", async ({
+  page,
+}) => {
+  const css = readFileSync("src/web/styles.css", "utf8");
+  await page.setContent(
+    `<style>${css}</style>
+     <div class="board" style="width:900px">
+       <section class="column" data-option="qa" style="flex:0 0 280px">
+         <header class="column-header draggable"><h2>QA</h2></header>
+       </section>
+       <section class="column" data-option="listo" style="flex:0 0 280px">
+         <header class="column-header draggable"><h2>Listo</h2></header>
+       </section>
+     </div>`,
+  );
+  const listo = page.locator('[data-option="listo"]');
+  const before = (await listo.boundingBox())!;
+
+  const width = 280;
+  await page.locator(".board").evaluate((board, w) => {
+    const slot = document.createElement("div");
+    slot.className = "drop-slot";
+    slot.style.flex = `0 0 ${w}px`;
+    slot.style.height = "120px";
+    board.insertBefore(slot, board.children[1]!);
+  }, width);
+
+  // La vecina se corre: el hueco más el gap de 20px de .board en escritorio.
+  const after = (await listo.boundingBox())!;
+  expect(Math.round(after.x - before.x)).toBe(width + 20);
+
+  const box = (await page.locator(".drop-slot").boundingBox())!;
+  const hit = await page.evaluate(
+    ([x, y]) =>
+      document
+        .elementsFromPoint(x, y)
+        .map((element) => element.className)
+        .join(" "),
+    [box.x + box.width / 2, box.y + box.height / 2] as [number, number],
+  );
+  expect(hit).toContain("drop-slot");
+});

@@ -47,14 +47,26 @@ test("board, collaborative editor, settings and mobile", async ({
   await expect(tile).toBeVisible();
   await tile.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
-  const drawer = await page.getByRole("dialog").boundingBox();
-  expect(Math.round(drawer!.x + drawer!.width)).toBe(
-    page.viewportSize()!.width,
+  // El drawer entra deslizando: se mide cuando la animación terminó, no en el
+  // primer frame, donde todavía está fuera de la pantalla. Se compara contra
+  // clientWidth y no contra el viewport: si hay barra de scroll, el borde
+  // derecho del área de layout no coincide con el del sistema.
+  const layoutWidth = await page.evaluate(
+    () => document.documentElement.clientWidth,
   );
-  await page.getByRole("button", { name: "Prioridad", exact: true }).click();
+  await expect
+    .poll(async () => {
+      const box = await page.getByRole("dialog").boundingBox();
+      return Math.round(box!.x + box!.width);
+    })
+    .toBe(layoutWidth);
+  // La barra de filtros del tablero también tiene un control "Prioridad": esta
+  // parte edita la tarjeta, así que se acota al panel.
+  const drawer = page.getByRole("dialog");
+  await drawer.getByRole("button", { name: "Prioridad", exact: true }).click();
   await page.getByRole("menuitemradio", { name: "alta", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Prioridad", exact: true }),
+    drawer.getByRole("button", { name: "Prioridad", exact: true }),
   ).toContainText("alta");
   const editor = page.getByRole("textbox", { name: "Contenido de la tarjeta" });
   await expect(editor).toBeVisible();

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Actor, ActionEvent } from "../core/actions";
-import { action, errorMessage, refresh, type BoardData } from "./api";
-import { DropdownSelect } from "./dropdown";
-import type { Field, Key, Webhook } from "../core/model";
+import type { Actor, ActionEvent } from "../../core/actions";
+import { action, errorMessage, refresh, type BoardData } from "../api";
+import { Button, DropdownSelect, Modal } from "../ui";
+import type { Field, Key, Webhook } from "../../core/model";
 export default function Settings({
   actor,
   board,
@@ -15,7 +15,6 @@ export default function Settings({
   close(): void;
   onError(message: string): void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const [result, setResult] = useState("");
   const [before, setBefore] = useState<number>();
   const keys = useQuery({
@@ -39,9 +38,6 @@ export default function Settings({
     queryKey: ["settings", "catalog"],
     queryFn: () => action<{ name: string; event: string }[]>("catalog.read"),
   });
-  useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
   async function perform(name: string, input: unknown) {
     try {
       const response = await action<Record<string, unknown>>(name, input);
@@ -53,17 +49,14 @@ export default function Settings({
     }
   }
   return (
-    <dialog
-      ref={dialog}
-      className="settings-dialog"
-      onCancel={(event) => {
-        event.preventDefault();
-        close();
-      }}
-    >
+    <Modal className="settings-dialog" onClose={close}>
       <header className="dialog-header">
         <h2>Configuración</h2>
-        <button className="dialog-close" onClick={close} aria-label="Cerrar configuración">
+        <button
+          className="dialog-close"
+          onClick={close}
+          aria-label="Cerrar configuración"
+        >
           ×
         </button>
       </header>
@@ -97,14 +90,14 @@ export default function Settings({
               {key.name} · {key.revoked ? "Revocada" : "Activa"}
             </span>
             {!key.revoked && (
-              <button
-                className="danger"
+              <Button
+                variant="danger"
                 onClick={() => {
                   void perform("key.revoke", { id: key.id });
                 }}
               >
                 Revocar
-              </button>
+              </Button>
             )}
           </div>
         ))}
@@ -313,14 +306,14 @@ export default function Settings({
                 >
                   {hook.enabled ? "Pausar" : "Activar"}
                 </button>
-                <button
-                  className="danger"
+                <Button
+                  variant="danger"
                   onClick={() => {
                     void perform("webhook.remove", { id: hook.id });
                   }}
                 >
                   Eliminar
-                </button>
+                </Button>
               </div>
             ))}
           </section>
@@ -349,7 +342,7 @@ export default function Settings({
         </button>
         <button onClick={() => setBefore(undefined)}>Más recientes</button>
       </section>
-    </dialog>
+    </Modal>
   );
 }
 function FieldSettings({
@@ -402,9 +395,9 @@ function FieldSettings({
           >
             ↑
           </button>
-          <button
+          <Button
             aria-label={`Eliminar opción ${option.label}`}
-            className="danger"
+            variant="danger"
             onClick={() =>
               setOptions((items) =>
                 items.filter((item) => item.id !== option.id),
@@ -412,7 +405,7 @@ function FieldSettings({
             }
           >
             ×
-          </button>
+          </Button>
         </div>
       ))}
       {(field.type === "select" || field.type === "multiSelect") && (
@@ -448,15 +441,15 @@ function FieldSettings({
       >
         Guardar propiedad
       </button>
-      <button
+      <Button
         disabled={grouping === field.id}
-        className="danger"
+        variant="danger"
         onClick={() => {
           void perform("field.remove", { id: field.id });
         }}
       >
         Eliminar propiedad
-      </button>
+      </Button>
     </details>
   );
 }

@@ -76,7 +76,11 @@ sesiones de navegador. El estado Yjs y su representación Markdown se confirman 
 - `src/adapters/http/`: Hono, autenticación de transporte y SSE.
 - `src/adapters/cli/`: cliente del catálogo HTTP.
 - `src/adapters/documents/`: conversión Markdown y colaboración.
-- `src/web/`: componentes React, TanStack Router y Query, CSS.
+- `src/web/`: el entry y el router (`main.tsx`), el cliente HTTP y la lógica de vista
+  que no es un componente (`api.ts`, `update.ts`, `filters.ts`, `stages.ts`, `drag.ts`).
+- `src/web/ui/`: primitivas de UI, tontas y sin dominio (ver abajo).
+- `src/web/components/`: componentes con lógica. Conocen el dominio, invocan acciones y
+  consumen `ui/`.
 - `src/server/`: configuración y composición de adaptadores.
 - `scripts/`: desarrollo, seed e importación.
 - `tests/`: dominio, integración con PostgreSQL y flujos UI/API/CLI.
@@ -103,9 +107,42 @@ conecta al backend del compose.
 **Por qué:** meter el frontend en Docker para desarrollo trae problemas con el caché
 de builds de TanStack y con los volúmenes. No vale la pena.
 
+## Las tres capas del frontend
+
+| Capa | Qué vive ahí | Qué no |
+|---|---|---|
+| `src/web/ui/` | Primitivas: botón, chip, icono, dropdown, avatares, composer, modal, toast, confirmación. | Nada del dominio: sin `Card`, sin `Field`, sin acciones, sin queries. |
+| `src/web/components/` | Componentes con lógica: `BoardPage`, `Board`, `CardTile`, `CardDialog`, `CardList`, `Filters`, `Login`, `Settings`, `DocumentEditor`. Invocan acciones y arman la predicción optimista. | Markup de un control que ya existe en `ui/`. |
+| `src/web/*.ts` | Lógica que no es un componente: `api.ts`, `update.ts`, `filters.ts`, `stages.ts`, `drag.ts`. `main.tsx` es solo el entry y el router. | Nada de JSX salvo el árbol de proveedores en `main.tsx`. |
+
+**Antes de escribir un control, mirá si ya existe en `ui/` y reusalo.** Si falta, se
+agrega ahí y se exporta desde `src/web/ui/index.ts` — nunca suelto en un componente ni en
+la raíz de `src/web/`.
+
+Un archivo por componente, y **el archivo se llama como el componente**: `Button.tsx`
+exporta `Button`, `DropdownSelect.tsx` exporta `DropdownSelect`. PascalCase para
+componentes; los módulos que no exportan uno (`api.ts`, `filters.ts`, `stages.ts`) siguen
+en minúscula.
+
+La regla que las mantiene reusables: **las primitivas son tontas.** No conocen `Card`,
+`Field` ni `Profile`, no llaman acciones ni leen queries. Reciben props y avisan por
+callback. La lógica —qué acción invocar, qué predicción dibujar, qué permiso hace falta—
+la pone la página que las consume.
+
+El estilo base del botón está en `styles.css` sobre el elemento `button`: un `<button>`
+pelado ya sale bien. `<Button variant>` existe solo para las variantes, así no quedan
+clases sueltas repartidas por los componentes.
+
+Un componente no guarda en estado local algo que ya vive en el caché de queries. La
+predicción optimista de `update.ts` deja el valor nuevo en el caché antes de que el
+servidor conteste, y lo devuelve solo si la acción falla; copiarlo a un `useState` con un
+`useEffect` agrega un render y se desincroniza cuando falla. Es la misma regla 3 de
+AGENTS.md vista desde el frontend.
+
 ## Convenciones
 
 - `pnpm` siempre. Nunca `npm`.
+- Controles de UI: reusar lo de `src/web/ui/`; primitiva tonta, lógica en `components/`.
 - Esquema de base de datos en código, con Drizzle como fuente de verdad.
 - Esquemas de eventos versionados y explícitos (ver [SPEC.md](SPEC.md)).
 

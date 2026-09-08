@@ -57,7 +57,24 @@ Un estándar reconocible da un criterio externo contra el cual medir cada decisi
 
 Mientras esto esté abierto, **no se escribe código de features.**
 
-### 5. `pnpm` siempre, nunca `npm`
+### 5. El frontend tiene tres capas y no se mezclan
+
+- `src/web/ui/` — **primitivas tontas.** No conocen el dominio: sin `Card`, sin `Field`,
+  sin acciones, sin queries. Reciben props y avisan por callback.
+- `src/web/components/` — **componentes con lógica.** Conocen el dominio, invocan
+  acciones y consumen `ui/`.
+- `src/web/*.ts` — lógica que no es un componente. `main.tsx` es solo el entry y el router.
+
+Antes de escribir un botón, un chip o un selector, mirá si ya está en `ui/` y reusalo. Si
+falta, va ahí y se exporta desde su `index.ts` — no suelto en un componente ni en la raíz
+de `src/web/`. Un archivo por componente, con el nombre del componente: `Button.tsx`
+exporta `Button`.
+
+Corolario de la regla 3: un componente **no copia a un `useState` algo que ya está en el
+caché de queries.** La predicción optimista ya dejó ahí el valor nuevo. Detalle en
+[CODE.md](CODE.md).
+
+### 6. `pnpm` siempre, nunca `npm`
 
 ## Stack
 
