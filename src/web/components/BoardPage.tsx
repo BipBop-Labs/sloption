@@ -20,6 +20,7 @@ import { Board } from "./Board";
 import { CardDialog } from "./CardDialog";
 import { CardList } from "./CardList";
 import { Filters } from "./Filters";
+import { History } from "./History";
 import { Login } from "./Login";
 const Settings = lazy(() => import("./Settings"));
 
@@ -29,6 +30,18 @@ const route = getRouteApi("/");
 const systemTheme = matchMedia("(prefers-color-scheme: dark)").matches
   ? "dark"
   : "light";
+const VIEWS: Record<string, { title: string; hint: string }> = {
+  week: { title: "Esta semana", hint: "Lo que elegimos hacer ahora." },
+  all: {
+    title: "Todas las tareas",
+    hint: "El trabajo del equipo, en un lugar.",
+  },
+  archived: { title: "Archivo", hint: "Lo que ya salió del tablero." },
+  history: {
+    title: "Historial",
+    hint: "Todo lo que pasó, de lo más reciente a lo más viejo.",
+  },
+};
 
 function transition(work: () => void) {
   if (
@@ -41,6 +54,9 @@ function transition(work: () => void) {
 
 export function BoardPage() {
   const search = route.useSearch();
+  const view = search.view ?? "week";
+  /** El historial no es una vista de tarjetas: no lleva pestañas ni filtros. */
+  const isBoard = view === "week" || view === "all";
   const navigate = useNavigate();
   const [toast, setToast] = useState("");
   const showError = useCallback((message: string) => setToast(message), []);
@@ -50,7 +66,7 @@ export function BoardPage() {
     retry: false,
   });
   const board = useQuery({
-    ...boardQuery(search.view ?? "week"),
+    ...boardQuery(view === "history" ? "all" : view),
     enabled: !!me.data,
   });
   // El tema sale del perfil, no de un estado aparte: mientras la acción viaja,
@@ -171,7 +187,7 @@ export function BoardPage() {
           Sloption
         </Link>
         <span className="subtitle">REVI / TAREAS</span>
-        {search.view !== "archived" && (
+        {isBoard && (
           <nav aria-label="Vistas">
             <Link
               to="/"
@@ -192,70 +208,77 @@ export function BoardPage() {
             </Link>
           </nav>
         )}
-        <button
-          onClick={() => {
-            void navigate({
-              to: "/",
-              search: (previous) => ({
-                ...previous,
-                settings: !previous.settings,
-              }),
-            });
-          }}
-        >
-          Configuración
-        </button>
-        <button
-          className="theme-toggle"
-          aria-label={
-            theme === "light" ? "Activar modo oscuro" : "Activar modo claro"
-          }
-          onClick={() => {
-            void toggleTheme();
-          }}
-        >
-          {theme === "light" ? "☾" : "☀"}
-        </button>
-        <button
-          onClick={async () => {
-            await request("/api/auth/sign-out", {});
-            queryClient.clear();
-            location.assign("/");
-          }}
-        >
-          Salir
-        </button>
+        <div className="header-actions">
+          <Link
+            to="/"
+            search={(previous: BoardSearch) => ({
+              ...previous,
+              view: "history",
+            })}
+            className="button"
+            aria-current={view === "history" ? "page" : undefined}
+          >
+            Historial
+          </Link>
+          <button
+            onClick={() => {
+              void navigate({
+                to: "/",
+                search: (previous) => ({
+                  ...previous,
+                  settings: !previous.settings,
+                }),
+              });
+            }}
+          >
+            Configuración
+          </button>
+          <button
+            className="theme-toggle"
+            aria-label={
+              theme === "light" ? "Activar modo oscuro" : "Activar modo claro"
+            }
+            onClick={() => {
+              void toggleTheme();
+            }}
+          >
+            {theme === "light" ? "☾" : "☀"}
+          </button>
+          <button
+            onClick={async () => {
+              await request("/api/auth/sign-out", {});
+              queryClient.clear();
+              location.assign("/");
+            }}
+          >
+            Salir
+          </button>
+        </div>
       </header>
       <div className="board-heading">
         <div>
-          <h1>
-            {search.view === "archived"
-              ? "Archivo"
-              : search.view === "week"
-                ? "Esta semana"
-                : "Todas las tareas"}
-          </h1>
+          <h1>{VIEWS[view]!.title}</h1>
           <p>
-            {board.data ? visible.length : "—"} tarjetas
-            {hidden > 0 && ` de ${board.data!.cards.length}`} ·{" "}
-            {search.view === "week"
-              ? "Lo que elegimos hacer ahora."
-              : search.view === "archived"
-                ? "Lo que ya salió del tablero."
-                : "El trabajo del equipo, en un lugar."}
+            {view !== "history" && (
+              <>
+                {board.data ? visible.length : "—"} tarjetas
+                {hidden > 0 && ` de ${board.data!.cards.length}`} ·{" "}
+              </>
+            )}
+            {VIEWS[view]!.hint}
           </p>
         </div>
         <Link
           to="/"
           search={(previous: BoardSearch) => ({
             ...previous,
-            view: search.view === "archived" ? "week" : "archived",
+            view: isBoard ? "archived" : "week",
           })}
         >
-          {search.view === "archived" ? "Volver al tablero" : "Ver archivadas"}
+          {isBoard ? "Ver archivadas" : "Volver al tablero"}
         </Link>
       </div>
-      {board.data && (
+      {board.data && view !== "history" && (
         <Filters
           filterable={filterable}
           profiles={board.data.profiles}
@@ -265,7 +288,9 @@ export function BoardPage() {
       )}
       {board.error && <p role="alert">{errorMessage(board.error)}</p>}
       {board.data &&
-        (search.view === "week" ? (
+        (view === "history" ? (
+          <History profiles={board.data.profiles} cards={board.data.cards} />
+        ) : view === "week" ? (
           <Board
             data={{ ...board.data, cards: visible }}
             open={open}

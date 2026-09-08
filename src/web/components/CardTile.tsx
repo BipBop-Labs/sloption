@@ -213,7 +213,7 @@ export const CardTile = memo(function CardTile({
           ids={Array.isArray(assignees) ? assignees : []}
           people={profiles}
         />
-        {card.weekly && <Chip weekly>Esta semana</Chip>}
+        {card.weekly && <Chip variant="highlight">Esta semana</Chip>}
       </div>
     </article>
   );

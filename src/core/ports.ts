@@ -12,6 +12,7 @@ export interface Transaction extends EventTransaction {
   history(
     before: number | undefined,
     limit: number,
+    includeReads: boolean,
   ): Promise<(ActionEvent & { sequence: number })[]>;
 }
 export interface Documents {

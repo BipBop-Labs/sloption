@@ -61,11 +61,20 @@ export function createStore(pool: Pool): UnitOfWork<Transaction> {
                 and(eq(records.collection, collection), eq(records.id, id)),
               );
           },
-          async history(before, limit) {
+          async history(before, limit, includeReads) {
             const rows = await dbtx
               .select()
               .from(events)
-              .where(before ? lt(events.sequence, before) : undefined)
+              .where(
+                and(
+                  before ? lt(events.sequence, before) : undefined,
+                  // Solo las acciones de lectura marcan `changed: false`. Los
+                  // eventos de sesión no traen el campo y siempre se muestran.
+                  includeReads
+                    ? undefined
+                    : sql`${events.payload}->'data'->>'changed' is distinct from 'false'`,
+                ),
+              )
               .orderBy(desc(events.sequence))
               .limit(limit);
             return rows.map((row) => ({
@@ -82,13 +91,11 @@ export function createStore(pool: Pool): UnitOfWork<Transaction> {
             const hooks = await transaction.list("webhooks");
             for (const hook of hooks)
               if (hook.enabled && hook.events.includes(event.type)) {
-                await dbtx
-                  .insert(deliveries)
-                  .values({
-                    id: `${stored.sequence}:${hook.id}`,
-                    eventSequence: stored.sequence,
-                    webhookId: hook.id,
-                  });
+                await dbtx.insert(deliveries).values({
+                  id: `${stored.sequence}:${hook.id}`,
+                  eventSequence: stored.sequence,
+                  webhookId: hook.id,
+                });
               }
             await dbtx.execute(
               sql`select pg_notify('sloption_events', ${String(stored.sequence)})`,

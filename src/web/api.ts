@@ -53,6 +53,7 @@ export function refresh() {
   void queryClient.invalidateQueries({ queryKey: ["board"] });
   void queryClient.invalidateQueries({ queryKey: ["card"] });
   void queryClient.invalidateQueries({ queryKey: ["settings"] });
+  void queryClient.invalidateQueries({ queryKey: ["history"] });
 }
 export function errorMessage(error: unknown) {
   return error instanceof Error

@@ -14,7 +14,8 @@
 - Invitaciones de un uso sin email, vinculación de identidades importadas.
 - Agentes con API keys revocables, sin vencimiento; auditoría del agente y su dueño.
 - Webhooks con firma HMAC, outbox durable y reintentos.
-- Historial consultable y sincronización SSE con recuperación por cursor.
+- Historial de eventos en su propia vista (`/?view=history`): tabla paginada por
+  cursor. Sincronización SSE con recuperación por cursor.
 - Drawer lateral, chips, apariencia similar a shadcn y tokens claro/oscuro.
   Tema persistido por usuario mediante acción. Esta indicación reemplazó Dell.
 - Hover de tarjeta con borde `--info`; al arrastrar, la tarjeta sale del flujo y
@@ -85,6 +86,35 @@ Usar la app y recoger ajustes del equipo. Mantener paridad UI/API/CLI en cada ca
 
 Formato: fecha — qué cambió. Agregá arriba, no abajo.
 
+### 2026-09-08 — El historial sale del modal y se vuelve una vista de eventos
+
+Estaba al final del modal de Configuración, como una lista infinita de `div`s. Con
+cinco personas usando la app todos los días eso no se lee.
+
+- `src/web/components/History.tsx` — tabla (Cuándo / Qué pasó / Quién / Dónde) de
+  50 filas por página. La paginación es la que ya tenía `history.list`: el cursor
+  es el `sequence` de la última fila. La pila de cursores vive en el componente,
+  así "Más recientes" vuelve página por página y no de un salto al principio.
+  La columna "Dónde" linkea a la tarjeta (`?card=…`) en los eventos `card.*`; el
+  resto de los eventos apunta a campos o webhooks, que no tienen pantalla propia.
+- Es `/?view=history`, la misma pantalla y el mismo parámetro que el archivo. No
+  hizo falta una ruta aparte.
+- **El historial no es una vista de tarjetas**, así que no va en las pestañas del
+  tablero: el link vive con Configuración, tema y Salir, en `.header-actions`
+  (que de paso reemplaza el `margin-left: auto` sobre el primer `button`). En esa
+  vista no se dibujan ni las pestañas ni los filtros de tarjetas.
+- **`history.list` toma `includeReads` (por defecto `false`).** Cada lectura emite
+  su evento y son la mayoría: de ~940 eventos locales, 655 eran `board.read` y
+  `card.read`. La consulta filtra `data.changed is distinct from 'false'`, así que
+  los eventos de sesión (`auth.login`, `stream.open`), que no traen el campo,
+  siguen apareciendo: sacarlos sería perder la auditoría de accesos. En la UI es la
+  casilla "Mostrar también quién miró qué". La CLI lo pasa igual, sin código nuevo.
+- `tests/e2e/history.spec.ts` cubre el flujo y **solo lee**: no crea tarjetas.
+
+Pendiente: `stream.open` emite un evento por reconexión SSE y es ruido, pero no es
+una lectura y no se puede filtrar con `changed`. Si molesta, hay que decidir qué
+eventos son de infraestructura.
+
 ### 2026-09-08 — Primitivas de UI en `src/web/ui/`
 
 Nueve primitivas, un archivo por componente y el archivo con el nombre del componente:
@@ -134,7 +164,12 @@ Los dos hallazgos del review de `vercel-react-best-practices` quedaron cerrados
 Barrida de UI hecha a mano dentro de `components/`, y lo que salió de ahí:
 
 - `CardTile` escribía `<span className="chip chip-week">` a mano mientras `Chip` ya tenía
-  la prop `weekly` **sin un solo uso**. Ahora usa `<Chip weekly>`.
+  una prop para eso **sin un solo uso**. La prop se llamaba `weekly`, o sea dominio
+  metido en una primitiva: ahora es `variant="highlight"`, con la misma forma que
+  `Button`. La clase pasó a `.chip-highlight` y los tokens `--week-*` a `--highlight-*`,
+  que además ya usaba `.secret-result` (la caja de API keys) sin tener nada que ver con
+  semanas. `button.week-mark` se queda con su nombre: es el toggle "Esta semana" de
+  `CardDialog`, o sea la capa de componentes, y ahí el dominio corresponde.
 - `ui/FilePicker` — el botón "Imagen" del editor era un `<label className="button">` con
   un `<input type="file">` escondido adentro. Es el truco que hay que hacer bien una vez
   (el label lo activa con teclado, `sr-only` en vez de `display:none` para no sacarlo del

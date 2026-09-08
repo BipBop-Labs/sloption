@@ -13,9 +13,9 @@
   --ring: #a1a1aa;
   --info: #087f93;
   --danger: #b91c1c;
-  --week-bg: #fef3c7;
-  --week-fg: #92400e;
-  --week-border: #fcd34d;
+  --highlight-bg: #fef3c7;
+  --highlight-fg: #92400e;
+  --highlight-border: #fcd34d;
   --radius: 8px;
   --radius-lg: 12px;
   --font:
@@ -54,9 +54,9 @@
   --ring: #71717a;
   --info: #56d6e7;
   --danger: #f87171;
-  --week-bg: #422b0a;
-  --week-fg: #fcd34d;
-  --week-border: #735013;
+  --highlight-bg: #422b0a;
+  --highlight-fg: #fcd34d;
+  --highlight-border: #735013;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.15);
   --shadow-popover: 0 8px 28px rgb(0 0 0 / 0.4);
   --shadow-drawer: -12px 0 40px rgb(0 0 0 / 0.3);
@@ -244,11 +244,17 @@ label input {
   color: var(--foreground);
   box-shadow: var(--shadow-sm);
 }
-.header > button {
-  margin-left: auto;
+.header-actions .button {
+  text-decoration: none;
 }
-.header > button + button {
-  margin-left: 0;
+.header-actions .button[aria-current="page"] {
+  background: var(--muted);
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
 }
 .theme-toggle {
   min-width: 40px;
@@ -436,10 +442,10 @@ button.week-mark {
   font-size: 10px;
 }
 button.week-mark.marked,
-.chip-week {
-  background: var(--week-bg);
-  color: var(--week-fg);
-  border: 1px solid var(--week-border);
+.chip-highlight {
+  background: var(--highlight-bg);
+  color: var(--highlight-fg);
+  border: 1px solid var(--highlight-border);
 }
 button.week-mark:hover {
   border-style: solid;
@@ -709,23 +715,63 @@ dialog {
 .field-settings > button {
   margin-right: 8px;
 }
-.history-entry {
-  display: grid;
-  gap: 4px;
-  padding: 12px 0;
+.history {
+  padding: 0 20px 32px;
+  overflow-x: auto;
+}
+.history table {
+  width: 100%;
+  min-width: 640px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.history th:nth-child(1) {
+  width: 190px;
+}
+.history th:nth-child(2) {
+  width: 180px;
+}
+.history th:nth-child(3) {
+  width: 200px;
+}
+.history th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.history th,
+.history td {
+  padding: 10px 12px 10px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 11px;
+  vertical-align: top;
   overflow-wrap: anywhere;
 }
-.history-entry time {
+.history td:first-child {
   color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.history-reads {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: fit-content;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.history-pages {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
 }
 .secret-result {
   margin: 16px 24px;
   padding: 16px;
-  border: 1px solid var(--week-border);
+  border: 1px solid var(--highlight-border);
   border-radius: var(--radius);
-  background: var(--week-bg);
+  background: var(--highlight-bg);
 }
 .secret-result textarea {
   width: 100%;
@@ -960,8 +1006,8 @@ dialog[open]::backdrop {
   .property-row {
     grid-template-columns: 140px minmax(0, 1fr);
   }
-  .history-entry {
-    grid-template-columns: 130px 1fr 1fr;
+  .history {
+    padding: 0 28px 32px;
   }
   .toast {
     left: auto;

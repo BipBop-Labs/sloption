@@ -666,12 +666,15 @@ export function createService(deps: {
       .object({
         before: z.number().int().positive().optional(),
         limit: z.number().int().min(1).max(100).default(50),
+        // Cada lectura emite su evento y son la mayoría: se piden aparte.
+        includeReads: z.boolean().default(false),
       })
       .strict(),
     z.array(eventSchema.extend({ sequence: z.number().int() })),
     "member",
     false,
-    async (input, _actor, tx) => tx.history(input.before, input.limit),
+    async (input, _actor, tx) =>
+      tx.history(input.before, input.limit, input.includeReads),
   );
   register(
     "webhook.list",

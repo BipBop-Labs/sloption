@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Actor, ActionEvent } from "../../core/actions";
+import type { Actor } from "../../core/actions";
 import { action, errorMessage, refresh, type BoardData } from "../api";
 import { Button, DropdownSelect, Modal } from "../ui";
 import type { Field, Key, Webhook } from "../../core/model";
@@ -16,7 +16,6 @@ export default function Settings({
   onError(message: string): void;
 }) {
   const [result, setResult] = useState("");
-  const [before, setBefore] = useState<number>();
   const keys = useQuery({
     queryKey: ["settings", "keys"],
     queryFn: () => action<Omit<Key, "digest">[]>("key.list"),
@@ -25,14 +24,6 @@ export default function Settings({
     queryKey: ["settings", "hooks"],
     queryFn: () => action<Omit<Webhook, "secret">[]>("webhook.list"),
     enabled: actor.role === "admin",
-  });
-  const history = useQuery({
-    queryKey: ["settings", "history", before],
-    queryFn: () =>
-      action<(ActionEvent & { sequence: number })[]>("history.list", {
-        before,
-        limit: 30,
-      }),
   });
   const catalog = useQuery({
     queryKey: ["settings", "catalog"],
@@ -319,29 +310,6 @@ export default function Settings({
           </section>
         </>
       )}
-      <section>
-        <h3>Historial</h3>
-        {history.data?.map((event) => (
-          <div className="history-entry" key={event.id}>
-            <time>{new Date(event.occurredAt).toLocaleString("es-CL")}</time>
-            <span>{event.type}</span>
-            <span>
-              {board?.profiles.find(
-                (profile) => profile.id === event.actor.userId,
-              )?.name ?? event.actor.userId}
-              {event.actor.agentId &&
-                ` / ${board?.profiles.find((profile) => profile.id === event.actor.agentId)?.name ?? "Agente"}`}
-            </span>
-          </div>
-        ))}
-        <button
-          onClick={() => setBefore(history.data?.at(-1)?.sequence)}
-          disabled={!history.data?.length}
-        >
-          Anteriores
-        </button>
-        <button onClick={() => setBefore(undefined)}>Más recientes</button>
-      </section>
     </Modal>
   );
 }
