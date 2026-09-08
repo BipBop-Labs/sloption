@@ -1,0 +1,12 @@
+.danger {
+  color: var(--danger);
+}
+.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+.primary:hover {
+  opacity: 0.9;
+  background: var(--primary);
+}

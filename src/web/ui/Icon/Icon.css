@@ -1,0 +1,8 @@
+button > .icon:not(:only-child) {
+  margin-right: 6px;
+}
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}

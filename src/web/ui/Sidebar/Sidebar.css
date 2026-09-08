@@ -1,0 +1,262 @@
+/* Pegada a la pantalla y de alto completo: la barra no crece con el tablero ni
+   se va con el scroll, así la cuenta queda siempre abajo a la vista.
+   Cerrada no se va: se encoge a una tira de iconos. Lo que se anima es el ancho
+   —de la barra y de cada etiqueta—, así que no hay saltos de layout. */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 68px;
+  width: 68px;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100dvh;
+  overflow: hidden;
+  padding: 16px 12px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  transition:
+    flex-basis 0.18s ease,
+    width 0.18s ease;
+}
+.sidebar-open {
+  flex-basis: 264px;
+  width: 264px;
+  overflow-y: auto;
+}
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-bottom: 16px;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 10px;
+  padding-left: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+.sidebar-brand a {
+  color: inherit;
+  text-decoration: none;
+}
+.sidebar-subtitle {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  border-left: 1px solid var(--border);
+  padding-left: 10px;
+}
+/* El nav es una ranura: cualquier enlace o botón que le pongan adentro toma la
+   forma de fila, así entra un Link del router sin que la primitiva lo sepa. */
+.sidebar nav {
+  display: grid;
+  gap: 2px;
+}
+.sidebar nav a,
+.sidebar nav button,
+.sidebar-collapse,
+.sidebar-expand,
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sidebar nav a:hover,
+.sidebar nav button:hover,
+.sidebar-collapse:hover,
+.sidebar-expand:hover {
+  background: var(--muted);
+  border-color: transparent;
+  color: var(--foreground);
+}
+.sidebar nav [aria-current="page"] {
+  background: var(--accent);
+  color: var(--foreground);
+}
+/* Lo que se encoge. La visibilidad se apaga recién al final para que el texto
+   no quede a medio recortar, y se enciende de entrada al abrir. */
+.sidebar-label {
+  max-width: 12rem;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 0.18s ease,
+    opacity 0.18s ease,
+    visibility 0s linear;
+}
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 16px;
+}
+/* El menú de la cuenta se alinea con la fila que lo abre, como el resto. */
+.sidebar-menu {
+  min-width: max(180px, var(--radix-dropdown-menu-trigger-width));
+}
+.sidebar-collapse,
+.sidebar-expand {
+  flex: 0 0 40px;
+  justify-content: center;
+  min-width: 40px;
+  padding: 4px;
+  font-size: 16px;
+  line-height: 1;
+}
+.sidebar-expand {
+  position: relative;
+}
+/* Encogida hay un solo botón visible, y sin etiqueta no se sabe qué hace. */
+.sidebar-expand::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 30;
+  left: calc(100% + 10px);
+  top: 50%;
+  translate: 4px -50%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-popover);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    translate 0.12s ease;
+}
+.sidebar-expand:hover::after,
+.sidebar-expand:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  translate: 0 -50%;
+}
+
+/* ---------- encogida ---------- */
+/* El truco: nada se desmonta. La marca y el botón de ocultar se van a ancho
+   cero, el de mostrar ocupa su lugar, y cada fila queda cuadrada y centrada. */
+.sidebar:not(.sidebar-open) .sidebar-brand,
+.sidebar:not(.sidebar-open) .sidebar-collapse,
+.sidebar.sidebar-open .sidebar-expand {
+  flex: 0 0 0;
+  min-width: 0;
+  width: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sidebar:not(.sidebar-open) .sidebar-header {
+  gap: 0;
+}
+/* Encogida el globo del botón se sale de la tira: si no, queda recortado. */
+.sidebar:not(.sidebar-open) {
+  overflow: visible;
+}
+.sidebar:not(.sidebar-open) .sidebar-label {
+  max-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition-delay: 0s, 0s, 0.18s;
+}
+.sidebar:not(.sidebar-open) nav a,
+.sidebar:not(.sidebar-open) nav button,
+.sidebar:not(.sidebar-open) .sidebar-user {
+  gap: 0;
+  justify-content: center;
+  padding-inline: 4px;
+}
+.sidebar-scrim {
+  display: none;
+}
+
+/* ---------- teléfono ---------- */
+/* No hay lugar ni para la tira: cerrada se va del todo y abierta tapa. */
+@media (max-width: 899px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    flex-basis: auto;
+    width: min(86vw, 320px);
+    overflow-y: auto;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateX(-101%);
+    transition: transform 0.15s ease;
+    box-shadow: 12px 0 40px var(--overlay);
+  }
+  .sidebar-open {
+    width: min(86vw, 320px);
+    transform: none;
+  }
+  /* Acá la barra tapa la pantalla, así que el botón útil es el de cerrarla. */
+  .sidebar .sidebar-collapse {
+    flex: 0 0 44px;
+    min-width: 44px;
+    width: auto;
+    padding: 4px;
+    opacity: 1;
+    pointer-events: auto;
+    font-size: 20px;
+  }
+  .sidebar .sidebar-expand {
+    display: none;
+  }
+  .sidebar .sidebar-brand {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    padding-left: 8px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sidebar .sidebar-label {
+    max-width: 12rem;
+    opacity: 1;
+    visibility: visible;
+  }
+  .sidebar nav a,
+  .sidebar nav button,
+  .sidebar-user {
+    gap: 10px;
+    justify-content: flex-start;
+    padding-inline: 10px;
+    min-height: 44px;
+  }
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--overlay);
+  }
+}

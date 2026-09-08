@@ -1,0 +1,34 @@
+.confirm-dialog h2 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.confirm-dialog p {
+  color: var(--muted-foreground);
+  margin-bottom: 20px;
+}
+.confirm-dialog input {
+  width: 100%;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 8px 10px;
+  font: inherit;
+  margin-bottom: 20px;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.confirm-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 20px;
+  width: calc(100% - 32px);
+  max-width: 420px;
+  margin: auto;
+  box-shadow: var(--shadow-popover);
+}

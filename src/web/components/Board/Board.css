@@ -1,0 +1,127 @@
+.board {
+  display: flex;
+  overflow: auto;
+  scroll-snap-type: x mandatory;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 0 16px 24px;
+  min-height: 70vh;
+}
+
+.column {
+  flex: 0 0 calc(100vw - 40px);
+  min-width: 0;
+  scroll-snap-align: center;
+  background: var(--muted);
+  border-radius: var(--radius-lg);
+  padding: 8px;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px 12px;
+  position: sticky;
+  top: 0;
+  background: var(--muted);
+  z-index: 1;
+  min-height: 44px;
+}
+
+.column-header.draggable {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.column.dragging {
+  cursor: grabbing;
+}
+
+.column-header h2 {
+  font-size: 12px;
+  flex: 1;
+}
+
+.column-header > span:last-child {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  min-width: 24px;
+  text-align: center;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dragging {
+  z-index: 10;
+  pointer-events: none;
+  will-change: transform;
+  box-shadow: var(--shadow-popover);
+  user-select: none;
+  cursor: grabbing;
+}
+
+@media (min-width: 480px) {
+  .column {
+    flex-basis: calc(50vw - 28px);
+  }
+}
+
+@media (min-width: 768px) {
+  .column {
+    flex: 1 0 270px;
+  }
+  .board {
+    padding: 0 28px 32px;
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .column {
+    flex-basis: 250px;
+  }
+}
+
+/* ---------- etapas ---------- */
+.stage-remove {
+  border: 0;
+  background: transparent;
+  padding: 4px;
+  color: var(--muted-foreground);
+  font-size: 16px;
+}
+
+.stage-remove:hover {
+  color: var(--danger);
+}
+
+.add-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: start;
+  background: transparent;
+  border: 1px dashed var(--input);
+  padding: 12px;
+}
+
+.add-stage input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.add-stage button {
+  display: inline-flex;
+  align-items: center;
+}

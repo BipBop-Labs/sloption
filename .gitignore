@@ -8,3 +8,5 @@ data/
 imports/
 test-results/
 playwright-report/
+.vscode/
+.impeccable/

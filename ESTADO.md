@@ -86,6 +86,95 @@ Usar la app y recoger ajustes del equipo. Mantener paridad UI/API/CLI en cada ca
 
 Formato: fecha — qué cambió. Agregá arriba, no abajo.
 
+### 2026-09-08 — Revisión Ousterhout del backend: identidad, límites y auditoría
+
+Revisión de los 16 archivos no-web con la skill de Ousterhout. El veredicto fue que las
+capas son las correctas y no falta ninguna nueva — `createActionRunner` y el puerto
+`Documents` son módulos profundos de manual, y `service.ts` no se parte: 816 líneas
+detrás de una interfaz de dos miembros es profundidad, no deuda. Lo que sí había eran
+tres fugas y un bug de auditoría.
+
+- **El historial escondía los eventos de seguridad.** Filtraba por `data.changed`, y
+  `changed` no significa "escribió": `key.revoke`, `webhook.create`, `webhook.remove` e
+  `invitation.create` escriben y estaban marcados `false`, así que no se veían. Ahora
+  filtra por el nombre de la acción (`.read`/`.list`). Verificado contra la base local:
+  recupera esos eventos y sigue ocultando las lecturas. El parámetro de `register` pasó
+  a `refreshesBoard`; el campo del evento sigue siendo `changed` porque `.v1` no se toca.
+- **La autenticación tenía tres dueños.** `resolveActor` vivía en `src/server/context.ts`
+  —reglas de negocio en el composition root— mientras `core/identity.ts` tenía `accept` y
+  `audit`. Ahora el núcleo expone `fromApiKey` y `fromSession`, y el adaptador HTTP
+  quedó con cinco líneas que solo eligen de dónde sale la credencial.
+  `tests/identity.test.ts` cubre key vigente, revocada, inexistente, sesión y sesión sin
+  perfil, con la misma tienda en memoria de `archive.test.ts`.
+- **El worker de webhooks salió de `src/server/`** a `src/adapters/postgres/`: leía la
+  tabla `records` y su JSONB con SQL crudo desde fuera del adaptador que los define.
+- **`fieldInput` se deriva de `propertySchema`.** Estaba escrito dos veces y las listas
+  de tipos ya habían divergido. `people` sigue excluido, ahora a propósito y comentado.
+
+Se descartaron dos cambios propuestos, y conviene saber por qué:
+
+- **La URL del asset se queda en el núcleo** (`/api/assets/:id`). Sacarla exigiría un
+  caso especial para `asset.create` en el adaptador HTTP, que entra por el endpoint
+  genérico de acciones: la cura es peor. La ruta es parte del contrato que un agente
+  consume, no un detalle de transporte.
+- **`card.read` sigue inicializando el documento al leer.** Toda tarjeta nace con
+  `document: null`, así que el init perezoso es load-bearing y sacarlo pide una
+  migración. Además no paga hasta que se toque el lock global: la lectura seguiría
+  abriendo transacción igual.
+
+Pendiente, medido pero no tocado: **toda transacción toma
+`pg_advisory_xact_lock(71924001)`, lecturas incluidas.** El comentario lo justifica
+diciendo que así los cursores SSE no pierden eventos, pero esa invariante la dan las
+escrituras serializadas; el lector del SSE ni pasa por el store. Con cinco personas no
+se nota. Antes de tocarlo, medir.
+
+Verificación: typecheck, 32 tests unitarios (6 nuevos), e2e de API y de historial, y
+comprobación por CLI de `field.create` en sus tres casos y de `history.list`.
+
+**El e2e de webhooks falla y no es por estos cambios** — falla idéntico sobre el código
+original: el contenedor no alcanza el receptor del test en la IP del gateway de Docker
+(`fetch failed`). Es del entorno.
+
+### 2026-09-08 — El frontend se ordena: cuatro capas, un directorio por componente
+
+`styles.css` tenía 969 líneas con el CSS de todas las pantallas mezclado, y en la raíz
+de `src/web/` convivían el entry, el router y cinco módulos sueltos. No se veía qué era
+una página ni de quién era una regla de CSS.
+
+- **`src/web/routes/`** — `router.tsx` (el árbol de rutas, que salió de `main.tsx`) y
+  `BoardPage/`. Una página es lo que el router monta; hoy hay una sola. Se usa `routes/`
+  y no `pages/` porque es la convención de TanStack Router: `pages/` es de Next, y
+  AGENTS.md dice que esto no es Next. `vercel-react-best-practices` no opina de
+  estructura de carpetas — es una guía de performance.
+- **`src/web/lib/`** — `api.ts`, `update.ts`, `filters.ts`, `drag.ts`, `stages.ts`.
+  `stages.ts` es una sola función pura, `reorderStages`: devuelve las opciones del campo
+  agrupador con una etapa movida antes de otra. Es el modelo detrás de arrastrar una
+  columna; `drag.ts` es la geometría del gesto sobre el DOM. Están separadas porque una
+  se prueba sin navegador y la otra no.
+- **Un directorio por componente, con su CSS al lado**, en `ui/` y en `components/`:
+  `Board/Board.tsx` + `Board/Board.css`, y el `.tsx` importa su `.css`.
+- `styles.css` queda en 262 líneas: tokens, estilo base de los elementos y tres
+  utilidades transversales sin dueño (`.error`, `.help`, `.sr-only`). La cabecera de
+  diálogo, que compartían `CardDialog` y `BoardFields`, subió a `ui/Modal/Modal.css` en
+  vez de duplicarse.
+- **`ui/SettingRow/`**: `.setting-row` estaba en `styles.css` pero tenía nombre propio y
+  seis usos entre `Settings` y `BoardFields`. El criterio que queda escrito en CODE.md:
+  si tiene nombre propio, es un componente; si es un selector de elemento o una utilidad
+  que cualquier pantalla futura va a querer, se queda en `styles.css`.
+- **El estilo base de `button` e `input` no se muda a `ui/`**, y CODE.md ahora dice por
+  qué: como selector de elemento aplica a cualquier `<button>` pelado sin importar nada;
+  dentro de `Button.css` solo aplicaría cuando algo importe `Button`, y hay `<button>`
+  sueltos por todos lados.
+- De regalo: el CSS de `Settings`, `BoardFields` y `DocumentEditor` —los tres que se
+  cargan con `lazy()`— ahora viaja en su propio chunk y no en el bundle inicial.
+- **Alias `@/`** (`tsconfig.json`, `vite.config.ts`, `vitest.config.ts`) para los
+  imports que cruzan de capa. Sin él, anidar un nivel dejaba `../../../core/model`.
+- AGENTS.md (regla 5) y CODE.md quedan actualizados: la regla eran tres capas y ahora
+  son cuatro.
+
+Sin cambios de comportamiento: es mover archivos y repartir CSS. `pnpm typecheck`,
+`pnpm test` (26) y `pnpm build` en verde.
+
 ### 2026-09-08 — El historial sale del modal y se vuelve una vista de eventos
 
 Estaba al final del modal de Configuración, como una lista infinita de `div`s. Con
@@ -336,3 +425,6 @@ Si se vuelve a mover código del frontend, cargá la app: el typecheck no alcanz
   descartaron `deploy-to-vercel`, `vercel-cli-with-tokens`, `vercel-optimize` (el
   despliegue es Coolify) y `react-native-skills`. De `ia-revi/skills` se tomaron seis con
   prefijo `revi-`; se omitió `daily` por ser un ritual de equipo ajeno al repo.
+- **Favicon**: `public/favicon.svg` — cuadrado redondeado blanco con borde negro y una "S"
+  geométrica, guiño al ícono de Notion. Linkeado desde `index.html`. Primer archivo en
+  `public/` (Vite lo copia a `dist/web` en el build).

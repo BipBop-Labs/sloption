@@ -1,0 +1,35 @@
+.fields-dialog {
+  width: calc(100% - 24px);
+  max-width: 720px;
+  max-height: 90dvh;
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  overflow: auto;
+}
+
+.fields-dialog section {
+  padding: 24px;
+}
+
+.field-settings {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.field-settings summary {
+  cursor: pointer;
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.field-settings > label {
+  margin: 12px 0;
+}
+
+.field-settings > button {
+  margin-right: 8px;
+}

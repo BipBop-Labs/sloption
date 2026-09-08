@@ -2,7 +2,13 @@ import { ActionError, type Actor, type UnitOfWork } from "./actions";
 import type { Secrets, Transaction } from "./ports";
 import { z } from "zod";
 
-/** Invitation redemption binds a previously inaccessible identity to an auth account. */
+/**
+ * Quién es el que llama. El adaptador extrae la credencial del transporte que
+ * conozca; qué identidad significa esa credencial se decide acá, así vale igual
+ * por HTTP, por CLI o por donde entre.
+ *
+ * Invitation redemption binds a previously inaccessible identity to an auth account.
+ */
 export function createIdentityService(deps: {
   store: UnitOfWork<Transaction>;
   secrets: Secrets;
@@ -62,6 +68,45 @@ export function createIdentityService(deps: {
           data: { profileId: profile.id },
         });
         return { ok: true };
+      });
+    },
+    /**
+     * Una API key actúa como su dueño y con sus permisos; el agente queda
+     * anotado aparte para que la auditoría distinga quién movió qué. Una key
+     * revocada no autentica.
+     */
+    async fromApiKey(token: string): Promise<Actor | null> {
+      const digest = deps.secrets.digest(token);
+      return deps.store.transaction(async (tx) => {
+        const key = (await tx.list("keys")).find(
+          (item) => item.digest === digest && !item.revoked,
+        );
+        if (!key) return null;
+        const profile = await tx.get("profiles", key.ownerId);
+        return profile
+          ? {
+              userId: profile.id,
+              role: profile.role,
+              agentId: key.agentId,
+              apiKeyId: key.id,
+            }
+          : null;
+      });
+    },
+    /** El rol sale del perfil, no del usuario de autenticación. */
+    async fromSession(authUserId: string): Promise<Actor | null> {
+      return deps.store.transaction(async (tx) => {
+        const profile = (await tx.list("profiles")).find(
+          (item) => item.authUserId === authUserId,
+        );
+        return profile
+          ? {
+              userId: profile.id,
+              role: profile.role,
+              agentId: null,
+              apiKeyId: null,
+            }
+          : null;
       });
     },
     async audit(

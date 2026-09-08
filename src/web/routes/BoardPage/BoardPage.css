@@ -1,0 +1,138 @@
+/* La barra lateral es una columna fija a la izquierda; el resto de la pantalla
+   es una sola columna que scrollea sola. */
+.app {
+  display: flex;
+  min-height: 100dvh;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-toggle {
+  min-width: 40px;
+  padding: 8px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  font-size: 18px;
+}
+
+@media (min-width: 900px) {
+  .nav-toggle {
+    display: none;
+  }
+}
+
+.board-heading {
+  padding: 28px 20px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+}
+
+.heading-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Acciones de la vista, no del producto: se leen como texto, no como botones. */
+.heading-link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.heading-link:hover {
+  background: transparent;
+  color: var(--foreground);
+  text-decoration: underline;
+}
+
+/* Las vistas del tablero: pestañas, no destinos de la navegación. */
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--muted);
+  border-radius: var(--radius);
+}
+
+.view-tabs a {
+  padding: 8px 12px;
+  text-align: center;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.view-tabs a:hover {
+  color: var(--foreground);
+}
+
+.view-tabs a.active {
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.board-heading p {
+  margin: 6px 0 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.loading {
+  min-height: 100vh;
+}
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -100px;
+  z-index: 100;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
+@media (min-width: 768px) {
+  .board-heading {
+    padding: 32px 28px 28px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .board-heading,
+  .board {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+}
+
+@media (max-width: 599px) {
+  .board-heading h1 {
+    font-size: 24px;
+  }
+  .view-tabs {
+    order: 3;
+    width: 100%;
+  }
+  .view-tabs a {
+    flex: 1;
+  }
+}

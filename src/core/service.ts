@@ -8,7 +8,11 @@ import {
 } from "./actions";
 import type { Card, Collection, Entities } from "./model";
 import type { Documents, Secrets, Transaction } from "./ports";
-import { parsePropertyValue, propertySchema } from "./properties";
+import {
+  parsePropertyValue,
+  propertySchema,
+  propertyTypeSchema,
+} from "./properties";
 
 const id = z.string().min(1).max(200);
 const empty = z.object({}).strict();
@@ -24,10 +28,14 @@ const role = z.enum(["admin", "member"]);
 const option = z
   .object({ id, label: z.string().trim().min(1).max(100) })
   .strict();
-const fieldInput = z
-  .object({
-    name: z.string().trim().min(1).max(100),
-    type: z.enum(["text", "number", "date", "select", "multiSelect"]),
+// Sale de `propertySchema` para que un tipo nuevo se agregue en un solo lugar;
+// antes estaba escrito de nuevo acá y las dos listas ya habían divergido.
+// `people` queda afuera a propósito: el campo de responsables lo siembra el seed
+// y su valor son perfiles, no opciones que alguien pueda escribir.
+const fieldInput = propertySchema
+  .omit({ id: true })
+  .extend({
+    type: propertyTypeSchema.exclude(["people"]),
     options: z.array(option).default([]),
   })
   .strict();
@@ -51,7 +59,7 @@ const cardSchema = z
   .strict();
 const profileSchema = z
   .object({
-    theme: z.enum(["light", "dark"]).optional(),
+    theme: z.enum(["light", "dark", "system"]).optional(),
     id,
     name: z.string(),
     role,
@@ -60,6 +68,9 @@ const profileSchema = z
     kind: z.enum(["person", "agent"]),
   })
   .strict();
+// `changed` significa "el tablero debe refrescarse", no "escribió algo":
+// `key.revoke` y los webhooks escriben y no tocan el tablero. El nombre queda
+// congelado por el esquema `.v1`; el parámetro de `register` sí dice la verdad.
 const eventData = z
   .object({ entityId: z.string().nullable(), changed: z.boolean() })
   .strict();
@@ -117,7 +128,7 @@ export function createService(deps: {
     input: z.ZodType<I>,
     output: z.ZodType,
     access: "member" | "admin",
-    changed: boolean,
+    refreshesBoard: boolean,
     handler: Handler<I>,
   ) {
     registry.set(name, (raw, actor) =>
@@ -141,7 +152,7 @@ export function createService(deps: {
                   "id" in record && typeof record.id === "string"
                     ? record.id
                     : null,
-                changed,
+                changed: refreshesBoard,
               },
             };
           },
@@ -529,7 +540,7 @@ export function createService(deps: {
   );
   register(
     "profile.preferences",
-    z.object({ theme: z.enum(["light", "dark"]) }).strict(),
+    z.object({ theme: z.enum(["light", "dark", "system"]) }).strict(),
     profileSchema,
     "member",
     true,

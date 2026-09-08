@@ -31,8 +31,8 @@ test("historial: vista propia, tabla paginada y lecturas aparte", async ({
       .getByRole("link", { name: "Historial" }),
   ).toHaveCount(0);
   await page
-    .locator(".header-actions")
-    .getByRole("link", { name: "Historial", exact: true })
+    .locator(".sidebar")
+    .getByRole("link", { name: "Historial de eventos" })
     .click();
   await expect(page).toHaveURL(/view=history/);
   await expect(
@@ -43,9 +43,8 @@ test("historial: vista propia, tabla paginada y lecturas aparte", async ({
   await expect(rows.first()).toBeVisible();
   const first = (await rows.first().innerText()).replace(/\s+/g, " ").trim();
   // El historial dejó de vivir en el modal de configuración.
-  await page
-    .getByRole("button", { name: "Configuración", exact: true })
-    .click();
+  await page.getByRole("button", { name: /^Cuenta de / }).click();
+  await page.getByRole("menuitem", { name: "Configuración" }).click();
   await expect(
     page.getByRole("heading", { name: "Configuración" }),
   ).toBeVisible();

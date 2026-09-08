@@ -1,5 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+
+// Cada componente trae su propia hoja: se cargan todas para que la prueba siga
+// midiendo las reglas reales aunque una regla cambie de archivo.
+function allStyles() {
+  return readdirSync("src/web", { recursive: true, encoding: "utf8" })
+    .filter((file) => file.endsWith(".css"))
+    .map((file) => readFileSync(`src/web/${file}`, "utf8"))
+    .join("\n");
+}
 
 // No necesita servidor ni base: monta las reglas reales sobre una columna.
 // Cubre las dos cosas que pueden romperse en silencio en el hueco de destino:
@@ -10,7 +19,7 @@ import { readFileSync } from "node:fs";
 test("el hueco de destino abre espacio y es visible al hit-test", async ({
   page,
 }) => {
-  const css = readFileSync("src/web/styles.css", "utf8");
+  const css = allStyles();
   await page.setContent(
     `<style>${css}</style>
      <section class="column" data-option="qa" style="width:280px">
@@ -57,7 +66,7 @@ test("el hueco de destino abre espacio y es visible al hit-test", async ({
 test("el hueco entre columnas abre espacio y es visible al hit-test", async ({
   page,
 }) => {
-  const css = readFileSync("src/web/styles.css", "utf8");
+  const css = allStyles();
   await page.setContent(
     `<style>${css}</style>
      <div class="board" style="width:900px">

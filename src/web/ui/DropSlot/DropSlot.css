@@ -1,0 +1,5 @@
+.drop-slot {
+  border: 1px dashed var(--info);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--info) 8%, transparent);
+}

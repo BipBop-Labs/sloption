@@ -9,7 +9,6 @@ import { createStore } from "../adapters/postgres/store";
 import { createService } from "../core/service";
 import { createIdentityService } from "../core/identity";
 import { documents } from "../adapters/documents/yjs";
-import type { Actor } from "../core/actions";
 
 if (
   !process.env.DATABASE_URL ||
@@ -44,39 +43,3 @@ export const identity = createIdentityService({
   newId: randomUUID,
   now: () => new Date(),
 });
-export async function resolveActor(headers: Headers): Promise<Actor | null> {
-  const bearer = headers.get("authorization");
-  if (bearer?.startsWith("Bearer ")) {
-    const digest = secrets.digest(bearer.slice(7));
-    return store.transaction(async (tx) => {
-      const key = (await tx.list("keys")).find(
-        (key) => key.digest === digest && !key.revoked,
-      );
-      if (!key) return null;
-      const profile = await tx.get("profiles", key.ownerId);
-      return profile
-        ? {
-            userId: profile.id,
-            role: profile.role,
-            agentId: key.agentId,
-            apiKeyId: key.id,
-          }
-        : null;
-    });
-  }
-  const session = await auth.api.getSession({ headers });
-  if (!session) return null;
-  return store.transaction(async (tx) => {
-    const profile = (await tx.list("profiles")).find(
-      (profile) => profile.authUserId === session.user.id,
-    );
-    return profile
-      ? {
-          userId: profile.id,
-          role: profile.role,
-          agentId: null,
-          apiKeyId: null,
-        }
-      : null;
-  });
-}

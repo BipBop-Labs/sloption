@@ -1,0 +1,121 @@
+.panel-dialog {
+  display: flex;
+  width: calc(100% - 24px);
+  max-width: 900px;
+  height: 90dvh;
+  padding: 0;
+  margin: auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+}
+.panel-rail {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 208px;
+  gap: 12px;
+  /* El título del riel y el de la sección arrancan a la misma altura. */
+  padding: 28px 12px 12px;
+  overflow-y: auto;
+  background: var(--muted);
+  border-right: 1px solid var(--border);
+}
+.panel-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
+}
+.panel-rail-head h2 {
+  flex: 1;
+  font-size: 16px;
+}
+.panel-content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+/* La × cierra el modal entero, así que vive en su esquina, no en la del riel. */
+.panel-content > .dialog-close {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 14px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 20px;
+  line-height: 1;
+}
+.panel-content > .dialog-close:hover {
+  color: var(--foreground);
+}
+.panel-rail nav {
+  display: grid;
+  gap: 2px;
+}
+.panel-tab {
+  justify-content: flex-start;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  text-align: left;
+}
+.panel-tab:hover {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--foreground);
+}
+.panel-tab.active {
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+}
+.panel-body {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--surface);
+}
+/* Deja libre la esquina de la ×. */
+.panel-body h3 {
+  padding-right: 32px;
+}
+.panel-body section {
+  padding: 28px 28px 24px;
+}
+.panel-body h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+.panel-body p {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+/* En teléfono no caben dos columnas: las secciones pasan a ser una tira
+   horizontal arriba del panel. */
+@media (max-width: 599px) {
+  .panel-dialog {
+    flex-direction: column;
+    max-width: none;
+    height: 92dvh;
+  }
+  .panel-rail {
+    flex: 0 0 auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-rail nav {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    overflow-x: auto;
+  }
+}

@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { app } from "../adapters/http/app";
-import { startWebhookWorker } from "./webhooks";
+import { startWebhookWorker } from "../adapters/postgres/webhooks";
 import { pool } from "./context";
 const server = serve({
   fetch: app.fetch,

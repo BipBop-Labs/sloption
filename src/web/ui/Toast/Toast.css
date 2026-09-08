@@ -1,0 +1,25 @@
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  max-width: 600px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  z-index: 10000;
+  font-size: 13px;
+}
+.toast button {
+  margin-left: auto;
+}
+@media (min-width: 768px) {
+  .toast {
+    left: auto;
+  }
+}

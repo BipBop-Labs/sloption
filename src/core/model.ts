@@ -1,7 +1,7 @@
 export type Role = "admin" | "member";
 export type Value = string | number | string[] | null;
 export interface Profile {
-  theme?: "light" | "dark";
+  theme?: "light" | "dark" | "system";
   id: string;
   name: string;
   role: Role;

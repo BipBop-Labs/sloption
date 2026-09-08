@@ -1,0 +1,51 @@
+/* ---------- filtros ---------- */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+
+.filter-search {
+  min-width: 180px;
+  flex: 0 1 240px;
+  min-height: 36px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 6px 10px;
+}
+
+.filter-search:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -1px;
+}
+
+.filter-clear {
+  min-height: 36px;
+  color: var(--muted-foreground);
+}
+
+.filter-count {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+.filter-count::before {
+  content: "·";
+  margin-right: 6px;
+}
+
+@media (min-width: 768px) {
+  .filters {
+    padding: 0 28px 20px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .filters {
+    padding: 0 40px 20px;
+  }
+}

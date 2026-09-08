@@ -4,7 +4,7 @@ import {
   activeFilter,
   filterableFields,
   matchesFilters,
-} from "../src/web/filters";
+} from "@/web/lib/filters";
 import type { Card, Field } from "../src/core/model";
 
 const fields: Field[] = [
@@ -88,11 +88,9 @@ describe("filtros del tablero", () => {
     ]);
     // Un parámetro viejo del campo agrupador queda inerte, no filtra a ciegas.
     expect(
-      matchesFilters(
-        card({ status: "qa" }),
-        filterableFields(all, "status"),
-        { status: "listo" },
-      ),
+      matchesFilters(card({ status: "qa" }), filterableFields(all, "status"), {
+        status: "listo",
+      }),
     ).toBe(true);
   });
 

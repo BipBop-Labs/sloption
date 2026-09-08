@@ -1,0 +1,56 @@
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  cursor: grab;
+  touch-action: pan-y;
+  position: relative;
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 132px;
+}
+
+.card:hover,
+.card:focus-visible {
+  border-color: var(--info);
+}
+
+/* La tarjeta es role="button" y heredaría el anillo gris genérico. Lo funde con
+   su propio borde: un solo filo cian, sin perder indicador de foco. */
+.card:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: -1px;
+}
+
+.card:focus-within {
+  content-visibility: visible;
+}
+
+.card h3 {
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 550;
+  letter-spacing: 0;
+  height: 58.5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 11px;
+}
+
+@media (pointer: coarse) {
+  .card-meta {
+    gap: 8px;
+  }
+}

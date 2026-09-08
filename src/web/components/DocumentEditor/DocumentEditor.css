@@ -1,0 +1,65 @@
+.editor-shell {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 12px 20px;
+}
+
+.editor-toolbar button,
+.editor-toolbar .button {
+  min-height: 32px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 0;
+  box-shadow: none;
+}
+
+.editor-toolbar > span {
+  align-self: center;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-left: auto;
+}
+
+.document-editor {
+  padding: 16px 24px 64px;
+  min-height: 300px;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.document-editor:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -4px;
+}
+
+.document-editor img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+.document-editor pre,
+.document-editor code {
+  font-family: var(--font);
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.document-editor h1,
+.document-editor h2,
+.document-editor h3 {
+  margin: 20px 0 12px;
+}
+
+.document-editor a {
+  color: var(--chip-4-fg);
+  text-decoration: underline;
+}

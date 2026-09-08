@@ -100,22 +100,29 @@ test("board, collaborative editor, settings and mobile", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Cerrar tarjeta" }).click();
   await second.close();
-  await page
-    .getByRole("button", { name: "Configuración", exact: true })
-    .click();
+  await page.getByRole("button", { name: /^Cuenta de / }).click();
+  await page.getByRole("menuitem", { name: "Configuración" }).click();
+  await page.getByRole("button", { name: "Usuarios" }).click();
   await expect(
     page.getByRole("heading", { name: "Usuarios e invitaciones" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Cerrar configuración" }).click();
-  await page.getByRole("button", { name: "Activar modo oscuro" }).click();
+  // El tema es una preferencia, no un botón de la cabecera: vive en General.
+  await page.getByRole("button", { name: "General" }).click();
+  await page.getByRole("button", { name: "Apariencia" }).click();
+  await page.getByRole("menuitemradio", { name: "Oscuro" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("button", { name: "Cerrar configuración" }).click();
   await page.screenshot({
     path: "test-results/board-dark.png",
     fullPage: false,
   });
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.getByRole("button", { name: "Activar modo claro" }).click();
+  await page.getByRole("button", { name: /^Cuenta de / }).click();
+  await page.getByRole("menuitem", { name: "Configuración" }).click();
+  await page.getByRole("button", { name: "Apariencia" }).click();
+  await page.getByRole("menuitemradio", { name: "Claro" }).click();
+  await page.getByRole("button", { name: "Cerrar configuración" }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: "test-results/board-mobile.png",

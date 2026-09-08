@@ -1,0 +1,18 @@
+.avatars {
+  display: flex;
+  margin-left: auto;
+}
+.avatar {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  outline: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: -4px;
+}

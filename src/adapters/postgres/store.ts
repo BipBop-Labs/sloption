@@ -68,11 +68,15 @@ export function createStore(pool: Pool): UnitOfWork<Transaction> {
               .where(
                 and(
                   before ? lt(events.sequence, before) : undefined,
-                  // Solo las acciones de lectura marcan `changed: false`. Los
-                  // eventos de sesión no traen el campo y siempre se muestran.
+                  // Una lectura es una acción que se llama `.read` o `.list`:
+                  // es la convención de todo el catálogo. No se filtra por
+                  // `changed`, que dice si el tablero debe refrescarse — con eso
+                  // se escondían `key.revoke` y los cambios de webhook, que son
+                  // justo lo que una auditoría necesita ver. Los eventos de
+                  // sesión (`auth.*`, `stream.open`) tampoco son lecturas.
                   includeReads
                     ? undefined
-                    : sql`${events.payload}->'data'->>'changed' is distinct from 'false'`,
+                    : sql`${events.payload}->>'type' !~ '\\.(read|list)\\.v[0-9]+$'`,
                 ),
               )
               .orderBy(desc(events.sequence))

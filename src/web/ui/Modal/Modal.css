@@ -1,0 +1,62 @@
+dialog {
+  color: var(--foreground);
+  background: var(--surface);
+  overscroll-behavior: contain;
+}
+dialog::backdrop {
+  background: var(--overlay);
+  opacity: 0;
+  transition:
+    opacity 0.22s ease,
+    display 0.22s allow-discrete,
+    overlay 0.22s allow-discrete;
+}
+dialog[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+/* La cabecera pegajosa que comparten los diálogos: título a la izquierda,
+ * la × a la derecha. La pone quien usa el Modal, el Modal no la impone. */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 3;
+}
+
+.dialog-header > span,
+.dialog-header > h2 {
+  flex: 1;
+}
+
+.dialog-header > span {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+/* Se estiliza por lo que el botón es, no por dónde cae: como :last-child,
+   cualquier botón agregado al final heredaba el aspecto del de cerrar. */
+.dialog-header > .dialog-close {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 10px;
+  color: var(--muted-foreground);
+}
+
+.dialog-header > .dialog-close:hover {
+  color: var(--foreground);
+}

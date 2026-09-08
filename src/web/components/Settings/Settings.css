@@ -1,0 +1,30 @@
+.secret-result {
+  margin: 16px 24px;
+  padding: 16px;
+  border: 1px solid var(--highlight-border);
+  border-radius: var(--radius);
+  background: var(--highlight-bg);
+}
+
+.secret-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.secret-value code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.secret-value button {
+  padding: 6px;
+  line-height: 0;
+  font-size: 18px;
+}

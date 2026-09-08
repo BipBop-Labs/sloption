@@ -57,18 +57,29 @@ Un estándar reconocible da un criterio externo contra el cual medir cada decisi
 
 Mientras esto esté abierto, **no se escribe código de features.**
 
-### 5. El frontend tiene tres capas y no se mezclan
+### 5. El frontend tiene cuatro capas y no se mezclan
 
+- `src/web/routes/` — **las páginas.** Una página es lo que el router monta y lo que la
+  URL nombra. `router.tsx` es el árbol de rutas; hoy hay una sola, `BoardPage`.
+- `src/web/components/` — **componentes con lógica.** Conocen el dominio, invocan
+  acciones y consumen `ui/`. Los paneles que abre un parámetro de búsqueda —la tarjeta,
+  configuración, propiedades— son componentes, no páginas: no tienen ruta propia.
 - `src/web/ui/` — **primitivas tontas.** No conocen el dominio: sin `Card`, sin `Field`,
   sin acciones, sin queries. Reciben props y avisan por callback.
-- `src/web/components/` — **componentes con lógica.** Conocen el dominio, invocan
-  acciones y consumen `ui/`.
-- `src/web/*.ts` — lógica que no es un componente. `main.tsx` es solo el entry y el router.
+- `src/web/lib/` — lógica de vista que no es un componente: `api.ts`, `update.ts`,
+  `filters.ts`, `drag.ts`, `stages.ts`. `main.tsx` es solo el entry y los proveedores.
+
+**Un directorio por componente, con su CSS al lado**: `Board/Board.tsx` +
+`Board/Board.css`, y el `.tsx` importa su `.css`. En la raíz de `src/web/` solo quedan
+`main.tsx` y `styles.css`, y `styles.css` es solo lo global: tokens, estilo base de los
+elementos y las pocas clases que comparten pantallas que no se conocen entre sí.
 
 Antes de escribir un botón, un chip o un selector, mirá si ya está en `ui/` y reusalo. Si
 falta, va ahí y se exporta desde su `index.ts` — no suelto en un componente ni en la raíz
-de `src/web/`. Un archivo por componente, con el nombre del componente: `Button.tsx`
-exporta `Button`.
+de `src/web/`.
+
+**Los imports que cruzan de capa usan el alias `@/`** (`@/core/model`, `@/web/lib/api`,
+`@/web/ui`); dentro de la misma capa, ruta relativa. Así no aparecen `../../../`.
 
 Corolario de la regla 3: un componente **no copia a un `useState` algo que ya está en el
 caché de queries.** La predicción optimista ya dejó ahí el valor nuevo. Detalle en

@@ -1,0 +1,44 @@
+/* La forma de fila la pone Sidebar.css, igual que a los enlaces del nav; acá
+   va solo lo propio: la inicial, el nombre y la línea de abajo. */
+.sidebar-user {
+  width: 100%;
+  min-height: 52px;
+  padding: 8px;
+}
+.sidebar-user:hover,
+.sidebar-user[data-state="open"] {
+  background: var(--muted);
+  border-color: transparent;
+  color: var(--foreground);
+}
+.sidebar-user > .avatar {
+  width: 28px;
+  height: 28px;
+  margin-left: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.sidebar-user-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+.sidebar-user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.sidebar-user-detail {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+/* Encogida queda solo la inicial: el chevron sin menú a la vista sobra. */
+.sidebar:not(.sidebar-open) .sidebar-user > .chevron {
+  display: none;
+}

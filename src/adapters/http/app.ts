@@ -7,14 +7,20 @@ import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { z } from "zod";
-import { ActionError } from "../../core/actions";
-import {
-  auth,
-  identity,
-  pool,
-  resolveActor,
-  service,
-} from "../../server/context";
+import { ActionError, type Actor } from "../../core/actions";
+import { auth, identity, pool, service } from "../../server/context";
+
+/**
+ * Lo único que este adaptador decide es de dónde saca la credencial: la cabecera
+ * `Authorization` o la cookie de sesión. Qué identidad significa cada una lo
+ * decide el núcleo.
+ */
+async function resolveActor(headers: Headers): Promise<Actor | null> {
+  const bearer = headers.get("authorization");
+  if (bearer?.startsWith("Bearer ")) return identity.fromApiKey(bearer.slice(7));
+  const session = await auth.api.getSession({ headers });
+  return session ? identity.fromSession(session.user.id) : null;
+}
 
 export const app = new Hono();
 app.use("*", secureHeaders());
