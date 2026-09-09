@@ -435,3 +435,7 @@ Si se vuelve a mover código del frontend, cargá la app: el typecheck no alcanz
   variables de entorno, forma de la salida y errores, operaciones de sesión y cómo
   averiguar la identidad propia con `history.list`. No lista las acciones a propósito:
   para eso está `catalog.read`, y así la ayuda no se desincroniza del catálogo.
+
+- **CLI instalable**: `pnpm -s install:cli` deja `sloption` en `~/.local/bin`
+  (o en `$SLOPTION_BIN`) como symlink al repo. Corre con Node 24+ sin dependencias
+  ni `pnpm install`, así que un agente clona, instala y usa; actualizar es `git pull`.

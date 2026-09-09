@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "sloption": "./src/adapters/cli/main.ts"
+  },
   "packageManager": "pnpm@11.10.0",
   "engines": {
     "node": ">=24"
@@ -16,7 +19,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "cli": "tsx src/adapters/cli/main.ts",
-    "import:notion": "tsx scripts/import-notion.ts"
+    "import:notion": "tsx scripts/import-notion.ts",
+    "install:cli": "mkdir -p \"${SLOPTION_BIN:-$HOME/.local/bin}\" && ln -sf \"$PWD/src/adapters/cli/main.ts\" \"${SLOPTION_BIN:-$HOME/.local/bin}/sloption\" && echo \"sloption -> $PWD/src/adapters/cli/main.ts\""
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

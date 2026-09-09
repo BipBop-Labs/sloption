@@ -48,24 +48,36 @@ incluye el dueño, el agente y el ID de la clave, nunca su secreto.
 
 ## CLI y API
 
+Instalación tras clonar (no necesita `pnpm install`: la CLI corre con Node 24+ solo,
+sin dependencias):
+
+```sh
+pnpm -s install:cli   # symlink sloption -> este repo, en ~/.local/bin
+sloption help
+```
+
+Para actualizar, `git pull`. El symlink apunta al repo, así que no hay que reinstalar.
+Si `~/.local/bin` no está en el PATH, elegí otro destino con
+`SLOPTION_BIN=/otro/bin pnpm -s install:cli`.
+
 ```sh
 export SLOPTION_URL=http://localhost:5173
 export SLOPTION_API_KEY=...
-pnpm cli help
-pnpm cli catalog.read '{}'
-pnpm cli board.read '{"view":"week"}'
-pnpm cli card.create '{"title":"Nueva tarea","weekly":true}'
-pnpm cli card.read '{"id":"..."}'
-pnpm cli card.move '{"id":"...","optionId":"cooking","beforeId":null}'
-pnpm cli card.week '{"id":"...","weekly":false}'
-pnpm cli profile.preferences '{"theme":"dark"}'
+sloption help
+sloption catalog.read '{}'
+sloption board.read '{"view":"week"}'
+sloption card.create '{"title":"Nueva tarea","weekly":true}'
+sloption card.read '{"id":"..."}'
+sloption card.move '{"id":"...","optionId":"cooking","beforeId":null}'
+sloption card.week '{"id":"...","weekly":false}'
+sloption profile.preferences '{"theme":"dark"}'
 ```
 
 Cada acción se expone en `POST /api/actions/<nombre>`, con JSON y autenticación por
 cookie o `Authorization: Bearer ...`. `catalog.read` describe inputs, outputs y eventos.
 Un argumento `@archivo.json` permite enviar documentos largos desde CLI.
 
-`pnpm cli auth.login @credenciales.json` devuelve la cookie; también se puede usar
+`sloption auth.login @credenciales.json` devuelve la cookie; también se puede usar
 `SLOPTION_COOKIE` en lugar de una API key. `auth.logout` e `invitation.accept` están
 disponibles sin navegador. Si apuntas directamente al puerto aleatorio del backend,
 configura `SLOPTION_ORIGIN` con el `APP_URL` esperado.

@@ -5,12 +5,15 @@ if (!name || name === "help" || name === "--help" || name === "-h") {
   console.log(`Sloption CLI — un adaptador más sobre las mismas acciones que usa la UI.
 Todo lo que se puede hacer en el navegador se puede hacer acá.
 
-USO
-  pnpm -s cli <acción> '<JSON>'        entrada como argumento
-  pnpm -s cli <acción> @archivo.json   entrada desde archivo (cuerpos largos, base64)
-  pnpm -s cli help
+INSTALACIÓN
+  pnpm -s install:cli   deja \`sloption\` en ~/.local/bin apuntando al repo.
+  Actualizar es \`git pull\`; el symlink sigue al repo. Otro destino: SLOPTION_BIN=/otro/bin.
+  Sin instalar: \`pnpm -s cli <acción>\` (con -s, o pnpm imprime su encabezado antes del JSON).
 
-  Usá siempre \`pnpm -s cli\`: sin -s, pnpm imprime su propio encabezado antes del JSON.
+USO
+  sloption <acción> '<JSON>'        entrada como argumento
+  sloption <acción> @archivo.json   entrada desde archivo (cuerpos largos, base64)
+  sloption help
 
 ENTORNO
   SLOPTION_URL      base del servidor (default http://localhost:5173)
@@ -24,7 +27,7 @@ SALIDA
   Códigos: UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, INVALID_INPUT, CONFLICT, INTERNAL.
 
 DESCUBRIMIENTO
-  pnpm -s cli catalog.read '{}'
+  sloption catalog.read '{}'
   Devuelve todas las acciones con su JSON Schema de entrada y salida, el acceso que
   piden (member/admin) y el evento que emiten. Es la fuente de verdad: esta ayuda no
   lista acciones a propósito, para no desincronizarse del catálogo.
@@ -36,7 +39,7 @@ SESIÓN (no son acciones del catálogo, son operaciones propias de la CLI)
 
 QUIÉN SOY
   No hay whoami. Tu propia huella alcanza:
-  pnpm -s cli history.list '{"limit":1,"includeReads":true}'
+  sloption history.list '{"limit":1,"includeReads":true}'
   En actor: userId es la persona dueña de la clave y agentId el perfil del agente.
   Ese agentId es el que va en un campo de tipo people para asignarte algo.
 
