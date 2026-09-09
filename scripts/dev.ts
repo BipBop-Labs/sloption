@@ -16,7 +16,9 @@ async function start() {
   process.env.BACKEND_URL = target;
   server = await createServer({
     server: {
-      host: "127.0.0.1",
+      // El origen debe coincidir con APP_URL: el backend rechaza los POST de otro
+      // origen, y "127.0.0.1" no es "localhost" para el navegador.
+      host: "localhost",
       proxy: { "/api": { target, changeOrigin: false } },
     },
   });
