@@ -51,6 +51,7 @@ incluye el dueño, el agente y el ID de la clave, nunca su secreto.
 ```sh
 export SLOPTION_URL=http://localhost:5173
 export SLOPTION_API_KEY=...
+pnpm cli help
 pnpm cli catalog.read '{}'
 pnpm cli board.read '{"view":"week"}'
 pnpm cli card.create '{"title":"Nueva tarea","weekly":true}'

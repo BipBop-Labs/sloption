@@ -428,3 +428,10 @@ Si se vuelve a mover código del frontend, cargá la app: el typecheck no alcanz
 - **Favicon**: `public/favicon.svg` — cuadrado redondeado blanco con borde negro y una "S"
   geométrica, guiño al ícono de Notion. Linkeado desde `index.html`. Primer archivo en
   `public/` (Vite lo copia a `dist/web` en el build).
+
+### 2026-09-09
+
+- **CLI**: `pnpm cli help` (también sin argumentos, `--help` o `-h`) documenta uso,
+  variables de entorno, forma de la salida y errores, operaciones de sesión y cómo
+  averiguar la identidad propia con `history.list`. No lista las acciones a propósito:
+  para eso está `catalog.read`, y así la ayuda no se desincroniza del catálogo.
