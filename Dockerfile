@@ -14,4 +14,4 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app /app
 USER node
-CMD ["sh", "-c", "./node_modules/.bin/tsx scripts/migrate.ts && ./node_modules/.bin/tsx scripts/seed.ts && ./node_modules/.bin/tsx src/server/main.ts"]
+CMD ["sh", "-c", "./node_modules/.bin/tsx scripts/migrate.ts && ./node_modules/.bin/tsx scripts/seed.ts && ./node_modules/.bin/tsx src/backend/server/main.ts"]

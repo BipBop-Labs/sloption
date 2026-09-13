@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { createWakeSignal } from "../src/adapters/http/wake-signal";
+import { createWakeSignal } from "../src/backend/adapters/http/wake-signal";
 it("does not lose a notification received while reading the database", async () => {
   vi.useFakeTimers();
   const signal = createWakeSignal();

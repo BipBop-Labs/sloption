@@ -4,12 +4,12 @@ import {
   createActionRunner,
   type ActionEvent,
   type Actor,
-} from "../src/core/actions";
+} from "../src/backend/core/actions";
 import {
   parsePropertyValue,
   removeOptionReference,
   type Property,
-} from "../src/core/properties";
+} from "../src/backend/core/properties";
 
 const actor: Actor = {
   userId: "owner",

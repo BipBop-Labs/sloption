@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "sloption": "./src/adapters/cli/main.ts"
+    "sloption": "./src/backend/adapters/cli/main.ts"
   },
   "packageManager": "pnpm@11.10.0",
   "engines": {
@@ -15,12 +15,12 @@
     "test": "vitest run",
     "dev": "tsx scripts/dev.ts",
     "build": "vite build",
-    "server": "tsx src/server/main.ts",
+    "server": "tsx src/backend/server/main.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "cli": "tsx src/adapters/cli/main.ts",
+    "cli": "tsx src/backend/adapters/cli/main.ts",
     "import:notion": "tsx scripts/import-notion.ts",
-    "install:cli": "mkdir -p \"${SLOPTION_BIN:-$HOME/.local/bin}\" && ln -sf \"$PWD/src/adapters/cli/main.ts\" \"${SLOPTION_BIN:-$HOME/.local/bin}/sloption\" && echo \"sloption -> $PWD/src/adapters/cli/main.ts\""
+    "install:cli": "mkdir -p \"${SLOPTION_BIN:-$HOME/.local/bin}\" && ln -sf \"$PWD/src/backend/adapters/cli/main.ts\" \"${SLOPTION_BIN:-$HOME/.local/bin}/sloption\" && echo \"sloption -> $PWD/src/backend/adapters/cli/main.ts\""
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

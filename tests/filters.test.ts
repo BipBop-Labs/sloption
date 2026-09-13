@@ -4,8 +4,8 @@ import {
   activeFilter,
   filterableFields,
   matchesFilters,
-} from "@/web/lib/filters";
-import type { Card, Field } from "../src/core/model";
+} from "@/frontend/lib/filters";
+import type { Card, Field } from "../src/backend/core/model";
 
 const fields: Field[] = [
   {

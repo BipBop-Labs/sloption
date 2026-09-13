@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { createIdentityService } from "../src/core/identity";
-import type { Collection, Entities } from "../src/core/model";
-import type { Transaction } from "../src/core/ports";
+import { createIdentityService } from "../src/backend/core/identity";
+import type { Collection, Entities } from "../src/backend/core/model";
+import type { Transaction } from "../src/backend/core/ports";
 
 /** Misma tienda en memoria que `archive.test.ts`: sin base ni servidor. */
 function identity() {

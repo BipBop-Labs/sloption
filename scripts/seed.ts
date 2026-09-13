@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { pool, store } from "../src/server/context";
+import { pool, store } from "../src/backend/server/context";
 const email = process.env.SEED_ADMIN_EMAIL;
 const password = process.env.SEED_ADMIN_PASSWORD;
 if (!email || !password || password.length < 12)

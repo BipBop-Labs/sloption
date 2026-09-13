@@ -47,6 +47,22 @@
 - Compose de desarrollo (DB + backend), frontend local y Compose de producción sin
   puertos publicados. Imagen de producción probada localmente, web y health HTTP 200.
 
+## Roadmap
+
+Después del refactor a dominios (plan del 2026-09-13):
+
+1. **Organizaciones.** Crear una y pertenecer a ella, con un rol por organización. Los
+   objetos pertenecen a la organización: el tablero pertenece a la org y la tarea al
+   tablero. Para leer una tarea hay que ser miembro de la org y tener acceso al tablero.
+2. **Varios tableros por organización, de varios tipos:** tareas (el actual),
+   calendario, hitos y lista de entradas. El admin define quién accede a cada tablero.
+3. **Una persona en varias organizaciones.** Es lo más difícil y puede que no se haga
+   nunca. La alternativa es un deploy completo de la app por organización.
+
+Lo que deja listo el refactor: `orgId` en el actor, el puerto `Authorizer.can(actor,
+boardId)`, `scope` en los endpoints (el runner carga el recurso, autoriza y lo
+inyecta) y listas filtradas por un servicio de auth.
+
 ## Datos locales
 
 Se importaron las 1006 tarjetas de los dos ZIP recibidos: 227 cuerpos asociados, 779

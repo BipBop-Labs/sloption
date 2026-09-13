@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import { documents, initialDocument } from "../src/adapters/documents/yjs";
+import { documents, initialDocument } from "../src/backend/adapters/documents/yjs";
 function fork(state: string) {
   const doc = new Y.Doc();
   Y.applyUpdate(doc, Buffer.from(state, "base64"));

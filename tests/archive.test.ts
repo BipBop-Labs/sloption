@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { createService } from "../src/core/service";
-import type { Actor } from "../src/core/actions";
-import type { Card, Collection, Entities } from "../src/core/model";
-import type { Transaction } from "../src/core/ports";
+import { createService } from "../src/backend/core/service";
+import type { Actor } from "../src/backend/core/actions";
+import type { Card, Collection, Entities } from "../src/backend/core/model";
+import type { Transaction } from "../src/backend/core/ports";
 
 const actor: Actor = {
   userId: "u",

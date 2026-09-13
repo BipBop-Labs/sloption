@@ -3,7 +3,7 @@ import { parse } from "csv-parse/sync";
 import { createHash } from "node:crypto";
 import { posix } from "node:path";
 import { writeFile } from "node:fs/promises";
-import type { Card, Field, Profile } from "../src/core/model";
+import type { Card, Field, Profile } from "../src/backend/core/model";
 const paths = process.argv.slice(2).filter((path) => !path.startsWith("--"));
 const dryRun = process.argv.includes("--dry-run");
 if (!paths.length) throw new Error("Pass one or more Notion export ZIP paths");
