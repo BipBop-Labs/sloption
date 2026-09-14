@@ -1,6 +1,7 @@
 import * as boards from "../boards/services";
 import * as cards from "../cards/services";
 import { implement } from "../kernel";
+import { FieldCreated, FieldRemoved, FieldUpdated } from "./events";
 import { fieldsRouter } from "./router";
 import * as fields from "./services";
 
@@ -9,7 +10,11 @@ export const fieldsOrchestrator = implement(fieldsRouter, {
     const field = await fields.create(tx, deps, input);
     return {
       output: field,
-      event: { fieldId: field.id, name: field.name, type: field.type },
+      event: FieldCreated({
+        fieldId: field.id,
+        name: field.name,
+        type: field.type,
+      }),
     };
   },
   async update(input, { tx, deps, resource: field }) {
@@ -20,11 +25,11 @@ export const fieldsOrchestrator = implement(fieldsRouter, {
     if (fields.hasOptions(field)) await cards.pruneOptions(tx, deps, field);
     return {
       output: field,
-      event: {
+      event: FieldUpdated({
         fieldId: field.id,
         name: field.name,
         optionIds: field.options.map((option) => option.id),
-      },
+      }),
     };
   },
   async remove(input, { tx, deps, fail }) {
@@ -32,6 +37,9 @@ export const fieldsOrchestrator = implement(fieldsRouter, {
     if (board.groupingId === input.id) fail("GROUPING_FIELD");
     await fields.remove(tx, input.id);
     await cards.removeValue(tx, deps, input.id);
-    return { output: { ok: true } as const, event: { fieldId: input.id } };
+    return {
+      output: { ok: true } as const,
+      event: FieldRemoved({ fieldId: input.id }),
+    };
   },
 });

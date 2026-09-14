@@ -37,12 +37,11 @@ No se ha desplegado a Coolify.
 
 ## Usuarios
 
-Solo un administrador puede invitar, vincular identidades importadas, cambiar roles,
+Solo un administrador puede invitar, cambiar roles,
 configurar propiedades y webhooks. Los miembros pueden trabajar en el tablero y crear
 sus propias claves de agentes. Las invitaciones generan un enlace para compartir,
 sin enviar correo. Se consumen una sola vez.
 
-Las identidades importadas no pueden iniciar sesión hasta vincularse con una invitación.
 Las claves no vencen, se pueden revocar y heredan el rol actual del dueño. Los eventos
 incluyen el dueño, el agente y el ID de la clave, nunca su secreto.
 
@@ -68,7 +67,7 @@ sloption catalog read
 sloption boards read '{"view":"week"}'
 sloption cards create '{"title":"Nueva tarea","weekly":true}'
 sloption cards read '{"id":"..."}'
-sloption cards move '{"id":"...","optionId":"cooking","beforeId":null}'
+sloption cards move '{"id":"...","optionId":"in progress","beforeId":null}'
 sloption cards week '{"id":"...","weekly":false}'
 sloption profiles preferences '{"theme":"dark"}'
 ```
@@ -83,38 +82,23 @@ las rutas de ahí. Un argumento `@archivo.json` permite enviar documentos largos
 disponibles sin navegador. Si apuntas directamente al puerto aleatorio del backend,
 configura `SLOPTION_ORIGIN` con el `APP_URL` esperado.
 
-## Importación de Notion
-
-```sh
-pnpm import:notion --dry-run /ruta/export-1.zip /ruta/export-2.zip
-pnpm import:notion /ruta/export-1.zip /ruta/export-2.zip
-```
-
-Usa `SLOPTION_URL` y `SLOPTION_API_KEY` de un administrador, o su `SLOPTION_COOKIE`.
-La importación se ejecuta como `import.apply`; los ZIP se leen sin extraer rutas al
-filesystem. Repetir los mismos exports no duplica tarjetas ni perfiles.
-
-Los exports recibidos contienen 1.006 tarjetas. Se asociaron 227 cuerpos por título
-único y se importaron cinco imágenes; 779 tarjetas indican que el cuerpo no estaba
-disponible. Los originales se conservan sin modificaciones en Downloads. Dependencias,
-relaciones y cálculos de otras bases se omiten. Fechas originales se conservan como
-texto para no inventar una zona horaria. Eduardo Esquivel no se crea como usuario.
-
 ## Colaboración y eventos
 
-El cuerpo se sincroniza mediante Yjs. `document.apply` acepta una actualización Yjs
+El cuerpo se sincroniza mediante Yjs. `cards applyDocument` acepta una actualización Yjs
 en base64 y devuelve tanto el estado colaborativo como el Markdown actual. Las
 actualizaciones concurrentes se combinan; modificar propiedades usa una versión y
-rechaza cambios obsoletos con `CONFLICT`.
+rechaza cambios obsoletos con `STALE_VERSION` (kind `CONFLICT`).
 
-Cada acción completada persiste un evento en la misma transacción. SSE informa cambios
-confirmados y recupera eventos al reconectar. Las lecturas también se auditan, pero no
-provocan nuevas recargas. El historial muestra persona y agente.
+Cada endpoint emite su evento en la misma transacción; los eventos están en el
+`events.ts` de cada dominio y `catalog read` lista sus nombres y payloads. No se guarda
+historial: los eventos salen por webhook y, si cambian el tablero, por SSE, que al
+reconectar recarga todo. Cada evento indica persona y agente.
 
 Los webhooks usan un outbox durable, hasta 10 intentos con espera exponencial. Verifica
 `X-Sloption-Signature` como HMAC-SHA256 de `timestamp + "." + rawBody`, usando el secreto
 del webhook y `X-Sloption-Timestamp`. Deduplica por `X-Sloption-Event-Id`; la entrega es
-al menos una vez. Los intentos y errores quedan en la tabla `deliveries`.
+al menos una vez. Lo pendiente y lo que falló queda en la tabla `deliveries`; lo
+entregado se borra.
 
 ## Verificación
 

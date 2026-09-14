@@ -2,8 +2,17 @@ import { z } from "zod";
 import { defineEndpoint, defineRouter } from "../../lib/endpoint";
 import { boardErrors } from "../boards/errors";
 import { valueErrors } from "../fields/errors";
-import { byId, id, readEvent } from "../kernel";
+import { byId, id } from "../kernel";
 import { cardErrors } from "./errors";
+import {
+  CardArchivedChanged,
+  CardBodyEdited,
+  CardCreated,
+  CardMoved,
+  CardUpdated,
+  CardViewed,
+  CardWeeklyChanged,
+} from "./events";
 import { cardSchema, valuesSchema } from "./model";
 import * as cards from "./services";
 
@@ -21,7 +30,7 @@ export const cardsRouter = defineRouter({
       input: byId,
       output: cardSchema,
       scope: card,
-      event: { data: readEvent, refreshesBoard: false },
+      event: CardViewed,
     }),
     create: defineEndpoint({
       doc: "Crea una tarjeta al final del tablero.",
@@ -34,12 +43,7 @@ export const cardsRouter = defineRouter({
         })
         .strict(),
       output: cardSchema,
-      event: {
-        data: z
-          .object({ cardId: id, title: z.string(), weekly: z.boolean() })
-          .strict(),
-        refreshesBoard: true,
-      },
+      event: CardCreated,
       errors: valueErrors,
     }),
     update: defineEndpoint({
@@ -55,16 +59,7 @@ export const cardsRouter = defineRouter({
         .strict(),
       output: cardSchema,
       scope: card,
-      event: {
-        data: z
-          .object({
-            cardId: id,
-            version: z.number().int(),
-            changedFields: z.array(z.string()),
-          })
-          .strict(),
-        refreshesBoard: true,
-      },
+      event: CardUpdated,
       errors: { ...cardErrors, ...valueErrors },
     }),
     week: defineEndpoint({
@@ -73,10 +68,7 @@ export const cardsRouter = defineRouter({
       input: z.object({ id, weekly: z.boolean() }).strict(),
       output: cardSchema,
       scope: card,
-      event: {
-        data: z.object({ cardId: id, weekly: z.boolean() }).strict(),
-        refreshesBoard: true,
-      },
+      event: CardWeeklyChanged,
     }),
     archive: defineEndpoint({
       doc: "Archiva o restaura. Al archivar guarda la etapa como etiqueta; al restaurar vuelve a esa etapa si todavía existe.",
@@ -84,16 +76,7 @@ export const cardsRouter = defineRouter({
       input: z.object({ id, archived: z.boolean() }).strict(),
       output: cardSchema,
       scope: card,
-      event: {
-        data: z
-          .object({
-            cardId: id,
-            archived: z.boolean(),
-            stage: z.string().nullable(),
-          })
-          .strict(),
-        refreshesBoard: true,
-      },
+      event: CardArchivedChanged,
       errors: boardErrors,
     }),
     move: defineEndpoint({
@@ -108,17 +91,7 @@ export const cardsRouter = defineRouter({
         .strict(),
       output: cardSchema,
       scope: card,
-      event: {
-        data: z
-          .object({
-            cardId: id,
-            fromOptionId: id.nullable(),
-            toOptionId: id.nullable(),
-            beforeId: id.nullable(),
-          })
-          .strict(),
-        refreshesBoard: true,
-      },
+      event: CardMoved,
       errors: { ...cardErrors, ...valueErrors, ...boardErrors },
     }),
     applyDocument: defineEndpoint({
@@ -127,10 +100,7 @@ export const cardsRouter = defineRouter({
       input: z.object({ id, update: z.string().min(1).max(3_000_000) }).strict(),
       output: cardSchema,
       scope: card,
-      event: {
-        data: z.object({ cardId: id, version: z.number().int() }).strict(),
-        refreshesBoard: true,
-      },
+      event: CardBodyEdited,
       errors: cardErrors,
     }),
   },

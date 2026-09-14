@@ -69,14 +69,13 @@ organizaciones: hoy no tendrían nada que decidir.
 
 ## Datos locales
 
-Se importaron las 1006 tarjetas de los dos ZIP recibidos: 227 cuerpos asociados, 779
-marcados como ausentes y cinco imágenes. Se omitieron dependencias, relaciones y
-cálculos de otras bases. Las siete identidades del export se crearon como miembros sin
-acceso; Eduardo Esquivel quedó excluido. Fechas originales conservadas como texto.
+El tablero viejo de Notion se descartó. El seed crea el admin inicial de `.env` y un
+tablero base con las etapas not started, in progress y done, más Prioridad y
+Encargado(s). Solo corre si todavía no hay un admin con acceso.
 
-El frontend corre en http://localhost:5173. `.env` contiene credenciales locales
-aleatorias y el admin `admin@sloption.local`; el archivo está ignorado por Git.
-README.md explica arranque, importación, CLI y configuración para Coolify.
+El frontend corre en http://localhost:5173. `.env` contiene las credenciales locales;
+el archivo está ignorado por Git. README.md explica arranque, CLI y configuración para
+Coolify.
 
 ## Verificación y límites
 
@@ -89,7 +88,6 @@ README.md explica arranque, importación, CLI y configuración para Coolify.
   integración. No ejecutar contra producción.
 - El editor se carga aparte (aprox. 160 KB gzip). No se ha hecho una medición formal
   de los presupuestos de latencia/CLS ni una prueba de carga multiusuario.
-- No se reconstruyen cuerpos ausentes ni relaciones externas de Notion.
 - No se desplegó a Coolify. La configuración usa el origen APP_URL y la red del proxy.
 
 - Validación final: TypeScript y build aprobados; 11 tests unitarios, dos flujos
@@ -100,13 +98,37 @@ README.md explica arranque, importación, CLI y configuración para Coolify.
 
 ## Próximo paso
 
-Decidir qué hacer con los datos locales: reimportar Notion en el volumen nuevo o
-recuperar `backoffice_postgres-dev`. Recrear los webhooks con los nombres de evento
-nuevos. Después, usar la app y recoger ajustes del equipo.
+Recrear los webhooks con los nombres de evento nuevos (`catalog read` los lista). La base
+de desarrollo actual se sembró antes del cambio y todavía tiene las siete etapas viejas:
+para ver el tablero base hay que vaciarla (`docker compose -f docker-compose.dev.yml
+down -v` y `./dev`). Después, usar la app y recoger ajustes del equipo.
 
 ## Bitácora
 
 Formato: fecha — qué cambió. Agregá arriba, no abajo.
+
+### 2026-09-13 — Eventos en su propio archivo, sin importación de Notion
+
+- **`events.ts` por dominio.** `defineEvent("cards.moved.v1", { data, refreshesBoard })`
+  define el evento; el router lo referencia (`event: CardMoved`) y el orquestador lo
+  construye (`event: CardMoved({...})`), lo que valida el payload en esa línea.
+  TypeScript exige devolver exactamente el evento del endpoint.
+- **El evento tiene nombre propio**, no el del endpoint: renombrar un endpoint no rompe
+  webhooks, y un evento puede salir de varios endpoints (`cards create` y un futuro
+  `cards batchCreate`). El catálogo lo lista una vez; dos definiciones distintas con el
+  mismo nombre rompen al arrancar.
+- **Nombres nuevos, en pasado:** `cards.created.v1`, `cards.moved.v1`,
+  `cards.archivedChanged.v1`, `auth.signedIn.v1`… La lista está en ACTIONS.md.
+- **Sin importación de Notion:** se borraron el dominio `imports`, `import-notion.ts`,
+  `adm-zip` y `csv-parse`. El tablero viejo se descarta.
+- **Seed:** tablero base con not started, in progress y done.
+- **Docker:** se borraron el contenedor `backoffice-db-1` y el volumen
+  `backoffice_postgres-dev`.
+- `app.spec` ya no depende del nombre de las etapas: usa la primera columna.
+
+Verificación: typecheck, build, 43 tests unitarios (4 nuevos de eventos: reuso entre
+endpoints, validación al construir, nombre duplicado y formato) y E2E 5/5 con el backend
+reconstruido.
 
 ### 2026-09-13 — Backend por dominios, eventos a webhooks, sin historial
 

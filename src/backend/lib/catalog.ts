@@ -2,10 +2,13 @@ import { z } from "zod";
 import { ActionError, raise } from "./errors";
 import {
   defineEndpoint,
+  defineEvent,
   defineRouter,
   eventSchema,
   implement,
   type AnyEndpoint,
+  type AnyEvent,
+  type Emitted,
   type Module,
   type RouterSpec,
 } from "./endpoint";
@@ -23,20 +26,17 @@ export interface Entry {
 /** Un nombre, ruta o comando repetido rompe al arrancar, no en la primera llamada. */
 export function listEndpoints(routers: readonly RouterSpec[]): Entry[] {
   const entries = routers.flatMap((router) =>
-    Object.entries(router.endpoints).map(([key, spec]): Entry => {
-      const name = `${router.name}.${key}`;
-      return {
-        name,
-        cli: `${router.cli} ${key}`,
-        http: {
-          method: spec.http?.method ?? "POST",
-          path: `${router.http}${spec.http?.path ?? `/${key}`}`,
-          response: spec.http?.response ?? "json",
-        },
-        event: spec.event ? `${name}.v1` : null,
-        spec,
-      };
-    }),
+    Object.entries(router.endpoints).map(([key, spec]): Entry => ({
+      name: `${router.name}.${key}`,
+      cli: `${router.cli} ${key}`,
+      http: {
+        method: spec.http?.method ?? "POST",
+        path: `${router.http}${spec.http?.path ?? `/${key}`}`,
+        response: spec.http?.response ?? "json",
+      },
+      event: spec.event?.type ?? null,
+      spec,
+    })),
   );
   const seen = new Set<string>();
   for (const entry of entries)
@@ -49,6 +49,23 @@ export function listEndpoints(routers: readonly RouterSpec[]): Entry[] {
       seen.add(key);
     }
   return entries;
+}
+
+/**
+ * Cada evento una vez, aunque lo emitan varios endpoints. Dos definiciones
+ * distintas con el mismo tipo rompen al arrancar: serían dos contratos con un
+ * mismo nombre.
+ */
+export function listEvents(definitions: readonly (AnyEvent | null)[]) {
+  const byType = new Map<string, AnyEvent>();
+  for (const definition of definitions) {
+    if (!definition) continue;
+    const known = byType.get(definition.type);
+    if (known && known !== definition)
+      throw new Error(`Evento definido dos veces: ${definition.type}`);
+    byType.set(definition.type, definition);
+  }
+  return [...byType.values()];
 }
 
 const listing = z
@@ -78,6 +95,11 @@ const listing = z
   })
   .strict();
 
+const CatalogViewed = defineEvent("catalog.viewed.v1", {
+  data: z.object({}).strict(),
+  refreshesBoard: false,
+});
+
 const catalogRouter = defineRouter({
   name: "catalog",
   http: "/api/catalog",
@@ -88,10 +110,7 @@ const catalogRouter = defineRouter({
       access: "member",
       input: z.object({}).strict(),
       output: listing,
-      event: {
-        data: z.object({ entityId: z.null() }).strict(),
-        refreshesBoard: false,
-      },
+      event: CatalogViewed,
     }),
   },
 });
@@ -110,13 +129,13 @@ export function createCatalog<Tx>(options: {
   newId(): string;
   now(): Date;
   /** Eventos que no salen de un endpoint, como el login. También se suscriben. */
-  events?: readonly string[];
+  events?: readonly AnyEvent[];
 }) {
   const catalogModule = implement<typeof catalogRouter, Tx, unknown>(
     catalogRouter,
     {
       async read() {
-        return { output: described, event: { entityId: null } };
+        return { output: described, event: CatalogViewed({}) };
       },
     },
   );
@@ -130,10 +149,10 @@ export function createCatalog<Tx>(options: {
       ),
     ),
   );
-  const events = [
-    ...entries.flatMap((entry) => (entry.event ? [entry.event] : [])),
+  const events = listEvents([
+    ...entries.map((entry) => entry.spec.event),
     ...(options.events ?? []),
-  ];
+  ]).map((event) => event.type);
   const described = {
     endpoints: entries.map(({ name, cli, http, event, spec }) => ({
       name,
@@ -193,18 +212,23 @@ export function createCatalog<Tx>(options: {
           raise(spec.errors ?? {}, code, message),
       });
       const output = spec.output.parse(result.output);
-      if (spec.event)
+      if (spec.event) {
+        const emitted = result.event as Emitted | undefined;
+        // TypeScript ya lo exige; esto cubre un `as` o un `any` en el orquestador.
+        if (emitted?.type !== spec.event.type)
+          throw new Error(`${name} debe emitir ${spec.event.type}`);
         await options.publish(
           tx,
           eventSchema.parse({
             id: options.newId(),
-            type: entry.event,
+            type: emitted.type,
             actor,
             occurredAt: options.now().toISOString(),
-            data: spec.event.data.parse(result.event),
+            data: emitted.data,
           }),
           { refreshesBoard: spec.event.refreshesBoard },
         );
+      }
       return output;
     });
   }

@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { createCatalog, listEndpoints } from "../src/backend/lib/catalog";
+import {
+  createCatalog,
+  listEndpoints,
+  listEvents,
+} from "../src/backend/lib/catalog";
 import {
   defineEndpoint,
+  defineEvent,
   defineRouter,
   implement,
   type ActionEvent,
@@ -33,6 +38,15 @@ interface SampleTx {
   published: ActionEvent[];
 }
 
+const ValueChanged = defineEvent("sample.valueChanged.v1", {
+  data: z.object({ value: z.number() }).strict(),
+  refreshesBoard: true,
+});
+const NoteViewed = defineEvent("sample.noteViewed.v1", {
+  data: z.object({ noteId: z.string() }).strict(),
+  refreshesBoard: false,
+});
+
 const sampleRouter = defineRouter({
   name: "sample",
   http: "/api/sample",
@@ -43,11 +57,15 @@ const sampleRouter = defineRouter({
       access: "member",
       input: z.object({ value: z.number() }).strict(),
       output: z.number(),
-      event: {
-        data: z.object({ value: z.number() }).strict(),
-        refreshesBoard: true,
-      },
+      event: ValueChanged,
       errors: defineErrors({ TOO_BIG: { kind: "CONFLICT", message: "Too big" } }),
+    }),
+    double: defineEndpoint({
+      doc: "Guarda el doble: emite el mismo evento que set.",
+      access: "member",
+      input: z.object({ value: z.number() }).strict(),
+      output: z.number(),
+      event: ValueChanged,
     }),
     wipe: defineEndpoint({
       doc: "Solo admins.",
@@ -74,10 +92,7 @@ const sampleRouter = defineRouter({
         from: (input) => input.id,
         allow: (actor, note) => note.ownerId === actor.userId,
       },
-      event: {
-        data: z.object({ noteId: z.string() }).strict(),
-        refreshesBoard: false,
-      },
+      event: NoteViewed,
     }),
   },
 });
@@ -98,7 +113,14 @@ function fixture({
       async set(input, { tx, fail }) {
         if (input.value > 100) fail("TOO_BIG");
         tx.setValue(input.value);
-        return { output: input.value, event: { value: input.value } };
+        return { output: input.value, event: ValueChanged(input) };
+      },
+      async double(input, { tx }) {
+        tx.setValue(input.value * 2);
+        return {
+          output: input.value * 2,
+          event: ValueChanged({ value: input.value * 2 }),
+        };
       },
       async wipe() {
         return { output: "ok" };
@@ -107,7 +129,10 @@ function fixture({
         return { output: "pong" };
       },
       async note(_input, { resource }) {
-        return { output: resource.id, event: { noteId: resource.id } };
+        return {
+          output: resource.id,
+          event: NoteViewed({ noteId: resource.id }),
+        };
       },
     },
   );
@@ -150,7 +175,7 @@ describe("runner", () => {
     expect(await f.call("sample.set", { value: 7 })).toBe(7);
     expect(f.published).toHaveLength(1);
     expect(f.published[0]).toMatchObject({
-      type: "sample.set.v1",
+      type: "sample.valueChanged.v1",
       actor: member,
       data: { value: 7 },
     });
@@ -217,7 +242,7 @@ describe("runner", () => {
     expect(entries.find((entry) => entry.name === "sample.set")).toMatchObject({
       cli: "sample set",
       http: { method: "POST", path: "/api/sample/set" },
-      event: "sample.set.v1",
+      event: "sample.valueChanged.v1",
     });
     expect(entries.find((entry) => entry.name === "sample.ping")).toMatchObject({
       http: { method: "GET", path: "/api/sample/ping" },
@@ -229,6 +254,45 @@ describe("runner", () => {
     expect(() => listEndpoints([sampleRouter, sampleRouter])).toThrow(
       "Endpoint repetido",
     );
+  });
+});
+
+describe("eventos", () => {
+  it("un mismo evento sale de dos endpoints y el catálogo lo lista una vez", async () => {
+    const f = fixture();
+    await f.call("sample.set", { value: 1 });
+    await f.call("sample.double", { value: 2 });
+    expect(f.published.map((event) => [event.type, event.data])).toEqual([
+      ["sample.valueChanged.v1", { value: 1 }],
+      ["sample.valueChanged.v1", { value: 4 }],
+    ]);
+    expect(
+      f.catalog.events.filter((type) => type === "sample.valueChanged.v1"),
+    ).toHaveLength(1);
+  });
+
+  it("construirlo valida el payload", () => {
+    expect(() => ValueChanged({ value: "7" as unknown as number })).toThrow();
+  });
+
+  it("dos definiciones con el mismo tipo rompen al arrancar", () => {
+    const Impostor = defineEvent("sample.valueChanged.v1", {
+      data: z.object({ other: z.string() }).strict(),
+      refreshesBoard: false,
+    });
+    expect(() => listEvents([ValueChanged, Impostor])).toThrow(
+      "Evento definido dos veces",
+    );
+    expect(listEvents([ValueChanged, null, ValueChanged])).toHaveLength(1);
+  });
+
+  it("el tipo tiene dominio, nombre y versión", () => {
+    expect(() =>
+      defineEvent("sin-version", {
+        data: z.object({}).strict(),
+        refreshesBoard: false,
+      }),
+    ).toThrow("Tipo de evento inválido");
   });
 });
 

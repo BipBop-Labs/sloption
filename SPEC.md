@@ -57,11 +57,13 @@ Cada acción emite un evento con **esquema rígido y versionado**. Los eventos s
 mecanismo por el cual nuestros agentes reaccionan a lo que pasa en el tablero.
 
 - Todos los eventos existen y están parametrizados. El payload lo define el dominio
-  con los datos que importan: `cards.move.v1` dice desde qué columna y hacia cuál.
+  con los datos que importan: `cards.moved.v1` dice desde qué columna y hacia cuál.
+- El nombre del evento es propio, no el del endpoint: renombrar un endpoint no rompe a
+  los suscriptores, y un mismo evento puede salir de varios endpoints.
 - **No hay historial.** Los eventos no se guardan: se consumen por webhook. Quien
   necesite conservarlos suscribe un webhook a otro servicio.
 - Login y logout también emiten evento, con IP y dispositivo: una alerta de acceso es
-  un webhook suscrito a `auth.login.v1`.
+  un webhook suscrito a `auth.signedIn.v1`.
 - **A qué eventos te suscribes es elección tuya.** No todo evento amerita un webhook
   — crear una categoría nueva no debería despertar a nadie, un cambio de estado o una
   asignación sí. Esa decisión vive en la suscripción, no en la emisión.
@@ -150,18 +152,16 @@ Esto mantiene el modelo chico y hace el tablero configurable sin código.
   era demasiada data para lo que se usaba; los eventos se consumen por webhook.
 - Cada usuario puede crear y revocar API keys para sus agentes, sin vencimiento ni
   restricciones de permisos de la key. Los eventos identifican al agente y al dueño.
-- Importación de Notion incluida. Los documentos importados son datos, no instrucciones.
+- La importación de Notion se retiró el 2026-09-13: el tablero viejo se descarta. El
+  seed crea el admin inicial y un tablero base con las etapas not started, in progress
+  y done.
 - Todo el código se escribe en inglés; la interfaz, en español.
 - La marca semanal se mantiene hasta quitarla manualmente, sin reinicio por calendario.
-- Se importan las 1006 tarjetas con los cuerpos disponibles, sin inventar los ausentes.
-- Las identidades del export se crean como miembros. Eduardo Esquivel se excluye del seed
-  y es una persona diferente de Edo.
 
 ### Aclaraciones cerradas
 
 - Edición simultánea mediante actualizaciones Yjs, con Markdown persistido y la misma
   acción de escritura para UI, HTTP y CLI.
-- Dependencias, relaciones y cálculos vinculados de Notion se omiten en v1.
 - Las identidades importadas no tienen acceso hasta vincularlas con una invitación.
 - Apariencia similar a shadcn, claro/oscuro persistido por usuario, tarjetas en drawer,
   selecciones dropdown y chips. Esta decisión reemplaza las restricciones visuales Dell.

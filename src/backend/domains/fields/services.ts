@@ -68,8 +68,3 @@ export async function update(
 }
 
 export const remove = (tx: Tx, fieldId: string) => tx.remove("fields", fieldId);
-
-export async function importMissing(tx: Tx, fields: Field[]) {
-  for (const field of fields)
-    if (!(await byId(tx, field.id))) await tx.put("fields", field);
-}

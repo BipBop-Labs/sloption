@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { defineEndpoint, defineRouter } from "../../lib/endpoint";
-import { byId, empty, id, ok, readEvent } from "../kernel";
+import { byId, empty, id, ok } from "../kernel";
 import { webhookErrors } from "./errors";
+import {
+  WebhookCreated,
+  WebhookRemoved,
+  WebhookUpdated,
+  WebhooksListed,
+} from "./events";
 import { webhookSchema } from "./model";
 import * as webhooks from "./services";
 
@@ -23,19 +29,14 @@ export const webhooksRouter = defineRouter({
       access: "admin",
       input: empty,
       output: z.array(webhookSchema),
-      event: { data: readEvent, refreshesBoard: false },
+      event: WebhooksListed,
     }),
     create: defineEndpoint({
       doc: "Suscribe una URL a eventos (catalog read los lista). Cada entrega va firmada con HMAC-SHA256; el secreto solo se devuelve acá.",
       access: "admin",
       input: subscription,
       output: webhookSchema.extend({ secret: z.string() }),
-      event: {
-        data: z
-          .object({ webhookId: id, url: z.string(), events: z.array(id) })
-          .strict(),
-        refreshesBoard: false,
-      },
+      event: WebhookCreated,
       errors: webhookErrors,
     }),
     update: defineEndpoint({
@@ -44,17 +45,7 @@ export const webhooksRouter = defineRouter({
       input: subscription.extend({ id }),
       output: webhookSchema,
       scope: { load: webhooks.byId, from: (input) => input.id },
-      event: {
-        data: z
-          .object({
-            webhookId: id,
-            url: z.string(),
-            events: z.array(id),
-            enabled: z.boolean(),
-          })
-          .strict(),
-        refreshesBoard: false,
-      },
+      event: WebhookUpdated,
       errors: webhookErrors,
     }),
     remove: defineEndpoint({
@@ -62,10 +53,7 @@ export const webhooksRouter = defineRouter({
       access: "admin",
       input: byId,
       output: ok,
-      event: {
-        data: z.object({ webhookId: id }).strict(),
-        refreshesBoard: false,
-      },
+      event: WebhookRemoved,
     }),
   },
 });

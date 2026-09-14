@@ -22,7 +22,7 @@ un proyecto aparte, se instala desde acá.
 ## Arquitectura elegida: hexagonal, cortada por dominio
 
 Ports & adapters, con el backend dividido en dominios verticales: auth, boards, cards,
-fields, webhooks, assets e imports. Los dominios no importan React, Hono, BetterAuth ni
+fields, webhooks y assets. Los dominios no importan React, Hono, BetterAuth ni
 Drizzle. Los adaptadores traducen protocolos y almacenamiento; el composition root
 conecta sus implementaciones. La CLI usa la API HTTP, que invoca exactamente el mismo
 catálogo que la web.
@@ -37,10 +37,10 @@ validación y auditoría, evitando capas que solo reenvían métodos.
 ### El wrapper: `src/backend/lib/`
 
 Cada endpoint se declara una vez, con `defineEndpoint` dentro de un `defineRouter`: doc,
-acceso (`public`, `member` o `admin`), input y output zod, errores, `scope` opcional y su
-evento, o `null` si no emite. De esa definición salen:
+acceso (`public`, `member` o `admin`), input y output zod, errores, `scope` opcional y el
+evento que emite, o `null` si no emite. De esa definición salen:
 
-- la acción `cards.move` y el evento `cards.move.v1`;
+- la acción `cards.move`;
 - la ruta HTTP, por defecto `POST /api/cards/move`, o la que declare `http`;
 - el comando `sloption cards move`;
 - su entrada en `catalog.read`, con JSON Schema del input, el output y el payload.
@@ -49,6 +49,15 @@ El runner (`createCatalog`, en `lib/catalog.ts`) corre igual cada llamada, venga
 venga: autentica con el puerto `Authenticator`, autoriza por rol, valida el input, abre la
 transacción, carga y autoriza el recurso de `scope`, llama al orquestador, valida output y
 payload, y publica el evento en la misma transacción.
+
+**Los eventos se definen aparte**, en el `events.ts` de cada dominio, con
+`defineEvent("cards.moved.v1", { data, refreshesBoard })`. El nombre es propio, no el del
+endpoint: es el contrato de los webhooks, así que renombrar un endpoint no los rompe, y un
+mismo evento puede salir de varios endpoints (`cards create` y un futuro
+`cards batchCreate`). El orquestador lo construye llamándolo —`event: CardMoved({...})`—,
+lo que valida el payload en esa línea. TypeScript exige que devuelva exactamente el evento
+que declara su endpoint; dos definiciones distintas con el mismo nombre rompen al
+arrancar.
 
 **La CLI llama a la API HTTP**, como `gh` o `stripe`: un solo lugar autentica, autoriza y
 emite, y la CLI funciona desde cualquier máquina con una API key. Saca las rutas de
@@ -62,7 +71,8 @@ emite, y la CLI funciona desde cualquier máquina con una API key. Saca las ruta
 - `orchestrator.ts`: una función por endpoint; `implement` obliga a implementarlas
   todas. Devuelve el output y el payload del evento.
 - `services.ts`: operaciones reutilizables que reciben la transacción.
-- `model.ts`, `errors.ts` y, si hace falta, `events.ts`.
+- `events.ts`: los eventos que emite el dominio.
+- `model.ts` y `errors.ts`.
 
 `domains/kernel.ts` es lo compartido: el mapa de colecciones, la transacción y las
 dependencias. Reglas, verificadas por `tests/architecture.test.ts`:
@@ -94,7 +104,7 @@ FORBIDDEN y se lo pasa al orquestador, sin una segunda lectura. Es la forma que 
 después el acceso por tablero del roadmap (ESTADO.md); el actor ya lleva `orgId`.
 
 Login y logout siguen en BetterAuth (`/api/auth/*`), fuera del catálogo, para conservar
-su rate limit y la cookie HttpOnly. Emiten `auth.login.v1` y `auth.logout.v1` con IP y
+su rate limit y la cookie HttpOnly. Emiten `auth.signedIn.v1` y `auth.signedOut.v1` con IP y
 user agent, suscribibles por webhook. La IP es el último valor de `X-Forwarded-For`, el
 que agrega el proxy de Coolify; el primero lo escribe el cliente.
 
@@ -124,7 +134,7 @@ PostgreSQL + Drizzle. Cada endpoint y su evento se confirman en la misma transac
   `deliveries`: outbox durable, firma HMAC y reintentos. Entregada se borra; después de
   diez fallos queda como `failed`. Quien necesite guardar eventos suscribe un webhook a
   otro servicio.
-- **Navegadores.** Si el endpoint declara `refreshesBoard`, un `pg_notify` avisa por SSE
+- **Navegadores.** Si el evento declara `refreshesBoard`, un `pg_notify` avisa por SSE
   y el cliente recarga. No hay cursor: al conectar o reconectar llega `ready` y el
   cliente recarga todo. Las lecturas emiten evento pero no refrescan el tablero, así no
   hay ciclo lectura → evento → recarga.
@@ -165,7 +175,7 @@ sesiones de navegador. El estado Yjs y su representación Markdown se confirman 
 - `src/frontend/ui/`: primitivas de UI, tontas y sin dominio (ver abajo).
 - `src/frontend/lib/`: lógica de vista que no es un componente — el cliente HTTP y lo
   demás (`api.ts`, `update.ts`, `filters.ts`, `stages.ts`, `drag.ts`).
-- `scripts/`: desarrollo, seed e importación.
+- `scripts/`: desarrollo, migraciones y seed (el admin inicial y un tablero base).
 - `tests/`: dominio, integración con PostgreSQL y flujos UI/API/CLI.
 
 ## Docker y entornos

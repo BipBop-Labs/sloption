@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { defineEndpoint, defineRouter } from "../../lib/endpoint";
-import { byId, id, readEvent } from "../kernel";
+import { byId, id } from "../kernel";
+import { AssetUploaded, AssetViewed } from "./events";
 import { assetSchema } from "./model";
 import * as assets from "./services";
 
@@ -20,12 +21,7 @@ export const assetsRouter = defineRouter({
         })
         .strict(),
       output: z.object({ id, url: z.string() }).strict(),
-      event: {
-        data: z
-          .object({ assetId: id, mime: z.string(), name: z.string() })
-          .strict(),
-        refreshesBoard: false,
-      },
+      event: AssetUploaded,
     }),
     read: defineEndpoint({
       doc: "La imagen como binario, con su Content-Type.",
@@ -34,7 +30,7 @@ export const assetsRouter = defineRouter({
       input: byId,
       output: assetSchema,
       scope: { load: assets.byId, from: (input) => input.id },
-      event: { data: readEvent, refreshesBoard: false },
+      event: AssetViewed,
     }),
   },
 });

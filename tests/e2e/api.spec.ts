@@ -172,7 +172,7 @@ test("webhook outbox retries, signs the body and names the agent", async ({
       await admin.post("/api/webhooks/create", {
         data: {
           url: `http://${gateway}:${address.port}`,
-          events: ["cards.create.v1"],
+          events: ["cards.created.v1"],
           enabled: true,
         },
       })
@@ -192,7 +192,7 @@ test("webhook outbox retries, signs the body and names the agent", async ({
       `sha256=${createHmac("sha256", hook!.secret).update(`${message.timestamp}.${message.body}`).digest("hex")}`,
     );
     const event = JSON.parse(message.body);
-    expect(event.type).toBe("cards.create.v1");
+    expect(event.type).toBe("cards.created.v1");
     expect(event.data).toEqual({
       cardId: card.id,
       title: "E2E webhook",

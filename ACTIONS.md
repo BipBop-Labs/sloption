@@ -1,29 +1,34 @@
 # Action catalog v1
 
 The source of truth is `catalog.read` (`sloption catalog read`): every endpoint with its
-doc, input/output JSON Schema, access, declared errors and event payload schema. This
-file is only a map.
+doc, input/output JSON Schema, access, declared errors and the event it emits, with its
+payload schema. This file is only a map.
 
-Each endpoint lives in `src/backend/domains/<domain>/router.ts`. Action `cards.move`
-is `POST /api/cards/move`, CLI `sloption cards move`, event `cards.move.v1`. Failures do
-not emit an event. Events never include passwords, invitation tokens or API keys, and
-they are not stored: webhooks consume them.
+Endpoints live in `src/backend/domains/<domain>/router.ts`. Action `cards.move` is
+`POST /api/cards/move` and CLI `sloption cards move`.
 
-| Endpoints | Access | Purpose |
+Events live in `src/backend/domains/<domain>/events.ts`, named on their own
+(`cards.moved.v1`), not after the endpoint: one event can be emitted by several
+endpoints, and renaming an endpoint does not break webhook subscribers. Failures do not
+emit. Events never include passwords, invitation tokens or API keys, and they are not
+stored: webhooks consume them.
+
+| Endpoints | Access | Events |
 |---|---|---|
-| boards.read, boards.configure | member / admin | Read board; change shared grouping |
-| cards.read, cards.create, cards.update, cards.move, cards.archive, cards.week | member | Card lifecycle and ordering |
-| cards.applyDocument | member | Merge a collaborative document update |
-| fields.create, fields.update, fields.remove | admin | Shared property schema and option ordering |
-| profiles.list, profiles.preferences | member | Assignable identities and persisted theme |
-| profiles.update, invitations.create | admin | Roles and invitations |
-| invitations.accept | public | Redeem an invitation |
-| keys.list, keys.create, keys.revoke | member, owner for revoke | Agent credentials |
-| webhooks.list, webhooks.create, webhooks.update, webhooks.remove | admin | Event subscriptions |
-| assets.create, assets.read | member | Embedded images; read is `GET /api/assets/:id` |
-| imports.apply | admin | Idempotent Notion import |
-| session.me | member | Who is calling; no event |
-| catalog.read | member | This catalog |
+| boards.read, boards.configure | member / admin | boards.viewed, boards.grouped |
+| cards.read, cards.create, cards.update | member | cards.viewed, cards.created, cards.updated |
+| cards.week, cards.archive, cards.move | member | cards.weeklyChanged, cards.archivedChanged, cards.moved |
+| cards.applyDocument | member | cards.bodyEdited |
+| fields.create, fields.update, fields.remove | admin | fields.created, fields.updated, fields.removed |
+| profiles.list, profiles.preferences | member | profiles.listed, profiles.themeChanged |
+| profiles.update | admin | profiles.roleChanged |
+| invitations.create / invitations.accept | admin / public | invitations.created, invitations.accepted |
+| keys.list, keys.create, keys.revoke | member, owner for revoke | keys.listed, keys.created, keys.revoked |
+| webhooks.list, webhooks.create, webhooks.update, webhooks.remove | admin | webhooks.listed, .created, .updated, .removed |
+| assets.create, assets.read | member | assets.uploaded, assets.viewed; read is `GET /api/assets/:id` |
+| session.me | member | none |
+| catalog.read | member | catalog.viewed |
 
-Sign-in and sign-out go through BetterAuth (`/api/auth/*`, CLI `session login` and
-`session logout`) and emit `auth.login.v1` and `auth.logout.v1` with IP and user agent.
+All events are `.v1`. Sign-in and sign-out go through BetterAuth (`/api/auth/*`, CLI
+`session login` and `session logout`) and emit `auth.signedIn.v1` and
+`auth.signedOut.v1` with IP and user agent.

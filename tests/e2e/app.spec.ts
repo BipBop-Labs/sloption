@@ -38,11 +38,14 @@ test("board, collaborative editor, settings and mobile", async ({
     fullPage: false,
   });
   const title = `E2E collaboration ${Date.now()}`;
+  // La primera columna, se llame como se llame: las etapas las define el seed.
   await page
-    .getByLabel("Nueva tarjeta en no comenzado", { exact: true })
+    .getByRole("textbox", { name: /^Nueva tarjeta en / })
+    .first()
     .fill(title);
   await page
-    .getByRole("button", { name: "Crear tarjeta en no comenzado", exact: true })
+    .getByRole("button", { name: /^Crear tarjeta en / })
+    .first()
     .click();
   const tile = page.getByRole("button", {
     name: `Abrir ${title}`,

@@ -2,7 +2,7 @@ import { eventSchema, type Actor } from "../../lib/endpoint";
 import { raise } from "../../lib/errors";
 import type { Deps, Tx } from "../kernel";
 import { invitationErrors, profileErrors } from "./errors";
-import { sessionEventData } from "./events";
+import { SignedIn, SignedOut } from "./events";
 import type { Invitation, Key, Profile, Role } from "./model";
 
 /** Una organización por deploy, por ahora. Ver Roadmap en ESTADO.md. */
@@ -87,19 +87,6 @@ export async function setRole(tx: Tx, profile: Profile, role: Role) {
   profile.role = role;
   await tx.put("profiles", profile);
   return profile;
-}
-
-/** Identidades importadas: existen como miembros sin acceso hasta que acepten una invitación. */
-export async function importPeople(tx: Tx, profiles: Profile[]) {
-  for (const profile of profiles)
-    if (!(await profileById(tx, profile.id)))
-      await tx.put("profiles", {
-        ...profile,
-        role: "member",
-        authUserId: null,
-        ownerId: null,
-        kind: "person",
-      });
 }
 
 export async function createInvitation(
@@ -207,11 +194,12 @@ export function sessionEvent(
   meta: { ip: string | null; userAgent: string | null },
   deps: Pick<Deps, "newId" | "now">,
 ) {
+  const emitted = (kind === "login" ? SignedIn : SignedOut)(meta);
   return eventSchema.parse({
     id: deps.newId(),
-    type: `auth.${kind}.v1`,
+    type: emitted.type,
     actor,
     occurredAt: deps.now().toISOString(),
-    data: sessionEventData.parse(meta),
+    data: emitted.data,
   });
 }

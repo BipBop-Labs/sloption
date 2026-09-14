@@ -39,15 +39,10 @@ if (!existing) {
       id: "status",
       name: "Estado",
       type: "select",
-      options: [
-        "no comenzado",
-        "cooking",
-        "QA",
-        "staged",
-        "deployed",
-        "listo",
-        "descartado",
-      ].map((label) => ({ id: label, label })),
+      options: ["not started", "in progress", "done"].map((label) => ({
+        id: label,
+        label,
+      })),
     });
     await tx.put("fields", {
       id: "priority",

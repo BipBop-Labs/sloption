@@ -1,7 +1,17 @@
 import { z } from "zod";
 import { actorSchema, defineEndpoint, defineRouter } from "../../lib/endpoint";
-import { byId, empty, id, ok, readEvent } from "../kernel";
+import { byId, empty, id, ok } from "../kernel";
 import { invitationErrors, profileErrors } from "./errors";
+import {
+  InvitationAccepted,
+  InvitationCreated,
+  KeyCreated,
+  KeyRevoked,
+  KeysListed,
+  ProfilesListed,
+  RoleChanged,
+  ThemeChanged,
+} from "./events";
 import { keySchema, profileSchema, roleSchema, themeSchema } from "./model";
 import * as auth from "./services";
 
@@ -31,10 +41,7 @@ export const profilesRouter = defineRouter({
       access: "member",
       input: z.object({ theme: themeSchema }).strict(),
       output: profileSchema,
-      event: {
-        data: z.object({ profileId: id, theme: themeSchema }).strict(),
-        refreshesBoard: true,
-      },
+      event: ThemeChanged,
       errors: profileErrors,
     }),
     list: defineEndpoint({
@@ -42,7 +49,7 @@ export const profilesRouter = defineRouter({
       access: "member",
       input: empty,
       output: z.array(profileSchema),
-      event: { data: readEvent, refreshesBoard: false },
+      event: ProfilesListed,
     }),
     update: defineEndpoint({
       doc: "Cambia el rol de una persona. Siempre queda al menos un administrador con acceso.",
@@ -50,10 +57,7 @@ export const profilesRouter = defineRouter({
       input: z.object({ id, role: roleSchema }).strict(),
       output: profileSchema,
       scope: { load: auth.profileById, from: (input) => input.id },
-      event: {
-        data: z.object({ profileId: id, role: roleSchema }).strict(),
-        refreshesBoard: true,
-      },
+      event: RoleChanged,
       errors: profileErrors,
     }),
   },
@@ -65,7 +69,7 @@ export const invitationsRouter = defineRouter({
   cli: "invitations",
   endpoints: {
     create: defineEndpoint({
-      doc: "Crea una invitación de un uso y devuelve su token. No envía correo: el enlace se comparte a mano. Con profileId liga una identidad importada.",
+      doc: "Crea una invitación de un uso y devuelve su token. No envía correo: el enlace se comparte a mano. Con profileId liga una identidad existente.",
       access: "admin",
       input: z
         .object({
@@ -75,12 +79,7 @@ export const invitationsRouter = defineRouter({
         })
         .strict(),
       output: z.object({ id, token: z.string() }).strict(),
-      event: {
-        data: z
-          .object({ invitationId: id, email: z.string(), role: roleSchema })
-          .strict(),
-        refreshesBoard: false,
-      },
+      event: InvitationCreated,
       errors: { ...profileErrors, ...invitationErrors },
     }),
     accept: defineEndpoint({
@@ -94,10 +93,7 @@ export const invitationsRouter = defineRouter({
         })
         .strict(),
       output: ok,
-      event: {
-        data: z.object({ invitationId: id, profileId: id }).strict(),
-        refreshesBoard: true,
-      },
+      event: InvitationAccepted,
       errors: invitationErrors,
     }),
   },
@@ -113,17 +109,14 @@ export const keysRouter = defineRouter({
       access: "member",
       input: empty,
       output: z.array(keySchema),
-      event: { data: readEvent, refreshesBoard: false },
+      event: KeysListed,
     }),
     create: defineEndpoint({
       doc: "Crea un agente y su API key. La key actúa con tus permisos. El token solo se devuelve acá.",
       access: "member",
       input: z.object({ name: z.string().trim().min(1).max(100) }).strict(),
       output: z.object({ id, agentId: id, token: z.string() }).strict(),
-      event: {
-        data: z.object({ keyId: id, agentId: id, ownerId: id }).strict(),
-        refreshesBoard: true,
-      },
+      event: KeyCreated,
     }),
     revoke: defineEndpoint({
       doc: "Revoca una API key propia. Deja de autenticar en la próxima llamada.",
@@ -135,10 +128,7 @@ export const keysRouter = defineRouter({
         from: (input) => input.id,
         allow: (actor, key) => key.ownerId === actor.userId,
       },
-      event: {
-        data: z.object({ keyId: id, agentId: id }).strict(),
-        refreshesBoard: false,
-      },
+      event: KeyRevoked,
     }),
   },
 });

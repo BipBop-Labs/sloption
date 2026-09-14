@@ -13,13 +13,12 @@ import type { Publish } from "../lib/ports";
 import type { Deps, Tx } from "../domains/kernel";
 import { assetsOrchestrator } from "../domains/assets/orchestrator";
 import { createAuthenticator } from "../domains/auth/authenticator";
-import { sessionEventTypes } from "../domains/auth/events";
+import { sessionEvents } from "../domains/auth/events";
 import { authOrchestrators } from "../domains/auth/orchestrator";
 import { sessionEvent } from "../domains/auth/services";
 import { boardsOrchestrator } from "../domains/boards/orchestrator";
 import { cardsOrchestrator } from "../domains/cards/orchestrator";
 import { fieldsOrchestrator } from "../domains/fields/orchestrator";
-import { importsOrchestrator } from "../domains/imports/orchestrator";
 import { webhooksOrchestrator } from "../domains/webhooks/orchestrator";
 import { subscribers } from "../domains/webhooks/services";
 
@@ -75,7 +74,6 @@ export const catalog = createCatalog({
     fieldsOrchestrator,
     webhooksOrchestrator,
     assetsOrchestrator,
-    importsOrchestrator,
   ],
   unitOfWork: store,
   authenticator,
@@ -83,7 +81,7 @@ export const catalog = createCatalog({
   deps,
   newId: deps.newId,
   now: deps.now,
-  events: sessionEventTypes,
+  events: sessionEvents,
 });
 
 export function recordSession(

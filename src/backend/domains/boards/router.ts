@@ -4,8 +4,9 @@ import { profileSchema } from "../auth/model";
 import { cardSummarySchema } from "../cards/model";
 import { fieldErrors } from "../fields/errors";
 import { propertySchema } from "../fields/model";
-import { id, readEvent } from "../kernel";
+import { id } from "../kernel";
 import { boardErrors } from "./errors";
+import { BoardGrouped, BoardViewed } from "./events";
 import { boardSchema } from "./model";
 
 export const boardsRouter = defineRouter({
@@ -29,17 +30,14 @@ export const boardsRouter = defineRouter({
           cards: z.array(cardSummarySchema),
         })
         .strict(),
-      event: { data: readEvent, refreshesBoard: false },
+      event: BoardViewed,
     }),
     configure: defineEndpoint({
       doc: "Elige la propiedad de selección simple que define las columnas.",
       access: "admin",
       input: z.object({ groupingId: id }).strict(),
       output: boardSchema,
-      event: {
-        data: z.object({ boardId: id, groupingId: id }).strict(),
-        refreshesBoard: true,
-      },
+      event: BoardGrouped,
       errors: { ...boardErrors, ...fieldErrors },
     }),
   },

@@ -19,7 +19,6 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "cli": "tsx src/backend/adapters/cli/main.ts",
-    "import:notion": "tsx scripts/import-notion.ts",
     "install:cli": "mkdir -p \"${SLOPTION_BIN:-$HOME/.local/bin}\" && ln -sf \"$PWD/src/backend/adapters/cli/main.ts\" \"${SLOPTION_BIN:-$HOME/.local/bin}/sloption\" && echo \"sloption -> $PWD/src/backend/adapters/cli/main.ts\""
   },
   "dependencies": {
@@ -46,14 +45,11 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@types/adm-zip": "^0.5.8",
     "@types/node": "^26.5.0",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "adm-zip": "^0.6.0",
-    "csv-parse": "^7.0.2",
     "drizzle-kit": "^0.31.10",
     "prettier": "^3.9.6",
     "tsx": "^4.23.13",

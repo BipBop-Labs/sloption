@@ -34,8 +34,9 @@ completo desde la CLI, sin navegador. Si no se puede, falta una acción.
 
 Nombre estable, input tipado, output tipado, errores explícitos. Invocable desde los
 tres adaptadores. Autoriza igual sin importar por dónde entró. Emite un evento de
-esquema rígido y versionado al completarse, con un payload que define su dominio, o
-declara `event: null`.
+esquema rígido y versionado al completarse, o declara `event: null`. Los eventos se
+definen en el `events.ts` del dominio con nombre propio, no el del endpoint, y un mismo
+evento puede salir de varios endpoints.
 
 Si agregás una operación sin su definición en un `router.ts`, está incompleta. No hay
 historial: los eventos se consumen por webhook.
@@ -62,7 +63,8 @@ Mientras esto esté abierto, **no se escribe código de features.**
 ### 5. El backend se corta por dominio
 
 Cada dominio de `src/backend/domains/` tiene `router.ts` (solo definiciones y doc),
-`orchestrator.ts` (una función por endpoint) y `services.ts` (lo reutilizable).
+`events.ts` (los eventos que emite), `orchestrator.ts` (una función por endpoint) y
+`services.ts` (lo reutilizable).
 
 - Un orquestador usa servicios, propios o de otro dominio. **Nunca otro orquestador.**
 - Los servicios son lo único que se comparte entre dominios.

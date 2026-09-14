@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineEndpoint, defineRouter } from "../../lib/endpoint";
 import { byId, id, ok } from "../kernel";
 import { fieldErrors } from "./errors";
+import { FieldCreated, FieldRemoved, FieldUpdated } from "./events";
 import { propertySchema, propertyTypeSchema } from "./properties";
 import * as fields from "./services";
 
@@ -29,12 +30,7 @@ export const fieldsRouter = defineRouter({
       access: "admin",
       input: fieldInput,
       output: propertySchema,
-      event: {
-        data: z
-          .object({ fieldId: id, name: z.string(), type: propertyTypeSchema })
-          .strict(),
-        refreshesBoard: true,
-      },
+      event: FieldCreated,
       errors: fieldErrors,
     }),
     update: defineEndpoint({
@@ -49,12 +45,7 @@ export const fieldsRouter = defineRouter({
         .strict(),
       output: propertySchema,
       scope: { load: fields.byId, from: (input) => input.id },
-      event: {
-        data: z
-          .object({ fieldId: id, name: z.string(), optionIds: z.array(id) })
-          .strict(),
-        refreshesBoard: true,
-      },
+      event: FieldUpdated,
       errors: fieldErrors,
     }),
     remove: defineEndpoint({
@@ -62,10 +53,7 @@ export const fieldsRouter = defineRouter({
       access: "admin",
       input: byId,
       output: ok,
-      event: {
-        data: z.object({ fieldId: id }).strict(),
-        refreshesBoard: true,
-      },
+      event: FieldRemoved,
       errors: fieldErrors,
     }),
   },

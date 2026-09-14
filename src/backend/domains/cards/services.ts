@@ -189,14 +189,3 @@ export async function removeValue(tx: Tx, deps: Deps, fieldId: string) {
       await save(tx, deps, card);
     }
 }
-
-export async function importMissing(tx: Tx, cards: Card[]) {
-  let inserted = 0;
-  for (const card of cards)
-    if (!(await byId(tx, card.id))) {
-      await fields.validateValues(tx, card.values);
-      await tx.put("cards", card);
-      inserted++;
-    }
-  return inserted;
-}

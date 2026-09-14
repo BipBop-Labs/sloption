@@ -52,8 +52,6 @@ export const id = z.string().min(1).max(200);
 export const empty = z.object({}).strict();
 export const byId = z.object({ id }).strict();
 export const ok = z.object({ ok: z.literal(true) }).strict();
-/** Payload de las lecturas: qué se leyó, o null si fue una lista. */
-export const readEvent = z.object({ entityId: z.string().nullable() }).strict();
 
 export type { Asset, Board, Card, Field, Invitation, Key, Profile, Webhook };
 export type { Role } from "./auth/model";
