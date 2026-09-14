@@ -9,15 +9,31 @@ export type Theme = z.infer<typeof Theme>;
 
 const Name = z.string().trim().min(1).max(100);
 
+/**
+ * Quién llama. Una API key actúa como su dueño (`userId`, con su rol) y anota al
+ * agente aparte (`agentId`), para que los eventos distingan quién movió qué.
+ */
+export const Actor = z
+  .object({
+    userId: Id,
+    /** Hoy siempre "main": una organización por deploy. Ver Roadmap en ESTADO.md. */
+    orgId: Id,
+    role: Role,
+    agentId: Id.nullable(),
+    apiKeyId: Id.nullable(),
+  })
+  .strict();
+export type Actor = z.infer<typeof Actor>;
+
 export const Profile = z
   .object({
-    theme: Theme.optional(),
     id: Id,
     name: z.string(),
     role: Role,
+    kind: z.enum(["person", "agent"]),
+    theme: Theme.nullable(),
     authUserId: z.string().nullable(),
     ownerId: z.string().nullable(),
-    kind: z.enum(["person", "agent"]),
   })
   .strict();
 export type Profile = z.infer<typeof Profile>;

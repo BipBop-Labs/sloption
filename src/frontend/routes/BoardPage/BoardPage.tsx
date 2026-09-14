@@ -9,8 +9,7 @@ import {
 } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import type { Actor } from "@/backend/lib/endpoint";
-import type { Card } from "@/backend/domains/kernel";
+import type { Actor, Card } from "@/backend/domains/kernel";
 import {
   action,
   boardQuery,
@@ -145,9 +144,7 @@ export function BoardPage() {
         boardQuery(search.view === "week" ? "all" : "week"),
       );
   }, [board.data, search.view]);
-  const filterable = board.data
-    ? filterableFields(board.data.fields, board.data.board.groupingId)
-    : [];
+  const filterable = board.data ? filterableFields(board.data.fields) : [];
   const visible = board.data
     ? board.data.cards.filter((card) =>
         matchesFilters(card, filterable, search),
@@ -325,15 +322,16 @@ export function BoardPage() {
                       },
                     ]
               }
+              states={board.data.states}
               fields={board.data.fields}
               profiles={board.data.profiles}
-              groupingId={board.data.board.groupingId}
               open={open}
             />
           ))}
         {search.card && detail.data && board.data && (
           <CardDialog
             card={detail.data}
+            states={board.data.states}
             fields={board.data.fields}
             profiles={board.data.profiles}
             close={close}

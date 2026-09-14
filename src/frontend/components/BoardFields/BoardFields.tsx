@@ -4,9 +4,10 @@ import { action, errorMessage, refresh, type BoardData } from "@/frontend/lib/ap
 import { Button, DropdownSelect, Modal, SettingRow } from "@/frontend/ui";
 import type { Field } from "@/backend/domains/kernel";
 
-/** Las propiedades y las columnas son la forma del tablero, no una preferencia
- *  de la cuenta: se editan desde el tablero mismo. Solo las ve quien administra
- *  —cambiar una propiedad le cambia las tarjetas a todo el equipo. */
+/** Las propiedades son la forma del tablero, no una preferencia de la cuenta:
+ *  se editan desde el tablero mismo. Solo las ve quien administra —cambiar una
+ *  propiedad le cambia las tarjetas a todo el equipo. Las etapas se editan en
+ *  las columnas. */
 export default function BoardFields({
   board,
   close,
@@ -27,13 +28,9 @@ export default function BoardFields({
     }
   }
   return (
-    <Modal
-      className="fields-dialog"
-      label="Propiedades y columnas"
-      onClose={close}
-    >
+    <Modal className="fields-dialog" label="Propiedades" onClose={close}>
       <header className="dialog-header">
-        <h2>Propiedades y columnas</h2>
+        <h2>Propiedades</h2>
         <button
           className="dialog-close"
           onClick={close}
@@ -43,21 +40,9 @@ export default function BoardFields({
         </button>
       </header>
       <section>
-        <label>
-          Agrupar tablero por
-          <DropdownSelect
-            label="Agrupar tablero por"
-            value={board?.board.groupingId}
-            onChange={(value) => {
-              void perform("boards.configure", { groupingId: value });
-            }}
-            options={
-              board?.fields
-                .filter((field) => field.type === "select")
-                .map((field) => ({ id: field.id, label: field.name })) ?? []
-            }
-          />
-        </label>
+        <p className="help">
+          Las etapas se agregan, ordenan y quitan desde las columnas del tablero.
+        </p>
         <form
           onSubmit={async (event) => {
             event.preventDefault();
@@ -99,7 +84,6 @@ export default function BoardFields({
             key={`${field.id}-${JSON.stringify(field.options)}`}
             field={field}
             perform={perform}
-            grouping={board.board.groupingId}
           />
         ))}
       </section>
@@ -109,11 +93,9 @@ export default function BoardFields({
 function FieldSettings({
   field,
   perform,
-  grouping,
 }: {
   field: Field;
   perform(name: string, input: unknown): Promise<unknown>;
-  grouping: string;
 }) {
   const [name, setName] = useState(field.name);
   const [options, setOptions] = useState(field.options);
@@ -203,7 +185,6 @@ function FieldSettings({
         Guardar propiedad
       </button>
       <Button
-        disabled={grouping === field.id}
         variant="danger"
         onClick={() => {
           void perform("fields.remove", { id: field.id });

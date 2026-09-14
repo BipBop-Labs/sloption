@@ -8,6 +8,7 @@ import {
   implement,
   type AnyEndpoint,
   type AnyEvent,
+  type Caller,
   type Emitted,
   type Module,
   type RouterSpec,
@@ -120,10 +121,10 @@ const catalogRouter = defineRouter({
  * autentica, autoriza por rol, valida, abre la transacción, carga y autoriza el
  * recurso, llama al orquestador y publica el evento en la misma transacción.
  */
-export function createCatalog<Tx>(options: {
+export function createCatalog<Tx, Actor extends Caller>(options: {
   modules: readonly Module[];
   unitOfWork: UnitOfWork<Tx>;
-  authenticator: Authenticator;
+  authenticator: Authenticator<Actor>;
   publish: Publish<Tx>;
   deps: unknown;
   newId(): string;
@@ -131,7 +132,7 @@ export function createCatalog<Tx>(options: {
   /** Eventos que no salen de un endpoint, como el login. También se suscriben. */
   events?: readonly AnyEvent[];
 }) {
-  const catalogModule = implement<typeof catalogRouter, Tx, unknown>(
+  const catalogModule = implement<typeof catalogRouter, Tx, unknown, Actor>(
     catalogRouter,
     {
       async read() {

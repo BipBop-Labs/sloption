@@ -2,20 +2,17 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
-/** Cada import relativo de src/backend, resuelto a una ruta desde src/backend. */
+/** Cada archivo de src/backend con sus imports relativos, resueltos desde src/backend. */
 const root = resolve("src/backend");
-const imports = readdirSync(root, { recursive: true, encoding: "utf8" })
+const sources = readdirSync(root, { recursive: true, encoding: "utf8" })
   .filter((file) => file.endsWith(".ts"))
-  .flatMap((file) =>
-    [
-      ...readFileSync(join(root, file), "utf8").matchAll(
-        /from\s+"(\.{1,2}\/[^"]+)"/g,
-      ),
-    ].map((match) => ({
-      file,
-      target: relative(root, resolve(root, dirname(file), match[1]!)),
-    })),
-  );
+  .map((file) => ({ file, text: readFileSync(join(root, file), "utf8") }));
+const imports = sources.flatMap(({ file, text }) =>
+  [...text.matchAll(/from\s+"(\.{1,2}\/[^"]+)"/g)].map((match) => ({
+    file,
+    target: relative(root, resolve(root, dirname(file), match[1]!)),
+  })),
+);
 
 describe("dependencias del backend", () => {
   test("encontró imports que revisar", () => {
@@ -31,11 +28,31 @@ describe("dependencias del backend", () => {
     ).toEqual([]);
   });
 
+  test("lib no define modelos: no toca Drizzle", () => {
+    expect(
+      sources
+        .filter(
+          ({ file, text }) =>
+            file.startsWith("lib/") && text.includes("drizzle-orm"),
+        )
+        .map(({ file }) => file),
+    ).toEqual([]);
+  });
+
   test("solo el composition root importa orquestadores", () => {
     expect(
       imports.filter(
         ({ file, target }) =>
           target.endsWith("/orchestrator") && !file.startsWith("server/"),
+      ),
+    ).toEqual([]);
+  });
+
+  test("los modelos solo importan otros modelos", () => {
+    expect(
+      imports.filter(
+        ({ file, target }) =>
+          file.endsWith("models.ts") && !target.endsWith("models"),
       ),
     ).toEqual([]);
   });

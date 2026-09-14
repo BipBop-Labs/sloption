@@ -67,7 +67,8 @@ sloption catalog read
 sloption boards read '{"view":"week"}'
 sloption cards create '{"title":"Nueva tarea","weekly":true}'
 sloption cards read '{"id":"..."}'
-sloption cards move '{"id":"...","optionId":"in progress","beforeId":null}'
+sloption cards move '{"id":"...","stateId":"...","beforeId":null}'
+sloption cards assign '{"id":"...","assignees":["..."]}'
 sloption cards week '{"id":"...","weekly":false}'
 sloption profiles preferences '{"theme":"dark"}'
 ```
@@ -94,11 +95,11 @@ Cada endpoint emite su evento en la misma transacción; los eventos están en el
 historial: los eventos salen por webhook y, si cambian el tablero, por SSE, que al
 reconectar recarga todo. Cada evento indica persona y agente.
 
-Los webhooks usan un outbox durable, hasta 10 intentos con espera exponencial. Verifica
-`X-Sloption-Signature` como HMAC-SHA256 de `timestamp + "." + rawBody`, usando el secreto
-del webhook y `X-Sloption-Timestamp`. Deduplica por `X-Sloption-Event-Id`; la entrega es
-al menos una vez. Lo pendiente y lo que falló queda en la tabla `deliveries`; lo
-entregado se borra.
+Los webhooks se entregan después del commit, con hasta 10 intentos y espera
+exponencial. Verifica `X-Sloption-Signature` como HMAC-SHA256 de
+`timestamp + "." + rawBody`, usando el secreto del webhook y `X-Sloption-Timestamp`.
+Deduplica por `X-Sloption-Event-Id`. La entrega vive en memoria: si el servidor se
+reinicia, lo pendiente se pierde.
 
 ## Verificación
 

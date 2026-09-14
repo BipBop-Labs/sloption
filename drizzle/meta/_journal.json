@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1788881862043,
-      "tag": "0000_common_cerise",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1788882944712,
-      "tag": "0001_chubby_retro_girl",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1789344584686,
-      "tag": "0002_drop_event_history",
+      "when": 1789390975006,
+      "tag": "0000_init",
       "breakpoints": true
     }
   ]

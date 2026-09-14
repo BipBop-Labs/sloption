@@ -100,7 +100,8 @@ Una tarjeta es **un markdown con propiedades**. Ese es el modelo, no una metáfo
 
 ### Propiedades
 
-- Vienen algunas de base: **prioridad**, **responsable** (admite varios).
+- De base vienen la **prioridad**, como propiedad del tablero, y los **responsables**
+  (admite varios), que no son una propiedad sino a quién está asignada la tarjeta.
 - Se pueden **crear libremente** propiedades nuevas.
 - **Las tarjetas son uniformes**: una propiedad nueva pertenece al tablero, no a una
   tarjeta. Al crearla queda disponible en todas, y asignarle valor al resto tiene que
@@ -109,14 +110,17 @@ Una tarjeta es **un markdown con propiedades**. Ese es el modelo, no una metáfo
 
 ### Columnas
 
-Las columnas **no se definen a mano: se derivan de una propiedad de categoría.**
+Las columnas **son las etapas del tablero** (not started, in progress, done…). Cada
+tarjeta tiene una etapa, o ninguna. Arrastrar una tarjeta de columna a columna es
+cambiarle la etapa. El orden manual dentro de la columna se guarda por separado.
 
-Ejemplo: la propiedad `Estado` con valores `Inicio`, `Cooking`, `Desarrollo`, … genera
-una columna por valor. Arrastrar una tarjeta de columna a columna es exactamente
-cambiarle el valor de esa propiedad. El orden manual dentro de la columna se guarda
-por separado, según la aclaración posterior del usuario.
+Un admin agrega, renombra, reordena y quita etapas desde el tablero mismo. Quitar una
+deja sus tarjetas sin estado; no borra ninguna. Desde el 2026-09-14 no se agrupa por
+cualquier propiedad: las etapas son parte del tablero.
 
-Esto mantiene el modelo chico y hace el tablero configurable sin código.
+**Filtros:** por responsable y por las propiedades de selección del tablero (prioridad y
+las que cree el admin). No se filtra por etapa: eso ya lo muestran las columnas. Esta
+semana o backlog es una marca de la tarjeta, no un filtro.
 
 ### Las dos vistas
 
@@ -142,8 +146,8 @@ Esto mantiene el modelo chico y hace el tablero configurable sin código.
 - Propiedades nuevas: texto, número, fecha, selección y selección múltiple,
   sin obligatoriedad ni valores predeterminados. Eliminar una propiedad elimina sus
   valores; eliminar una opción limpia las referencias correspondientes.
-- Orden manual de tarjetas y columnas. Agrupación compartida por todo el equipo.
-  El orden dentro de una columna es independiente del valor que determina la columna.
+- Orden manual de tarjetas y de etapas, compartido por todo el equipo. El orden dentro
+  de una columna es independiente de la etapa.
 - No hay edición masiva (reemplaza la expectativa anterior de completar en bloque).
 - Editor visual estilo Notion con imágenes. Tarjetas archivables y restaurables.
 - Cambios visibles en vivo y edición simultánea del cuerpo con Yjs.

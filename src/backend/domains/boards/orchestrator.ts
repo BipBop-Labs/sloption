@@ -2,29 +2,36 @@ import * as auth from "../auth/services";
 import * as cards from "../cards/services";
 import * as fields from "../fields/services";
 import { implement } from "../kernel";
-import { BoardGrouped, BoardViewed } from "./events";
+import { BoardStatesChanged, BoardViewed } from "./events";
 import { boardsRouter } from "./router";
 import * as boards from "./services";
 
 export const boardsOrchestrator = implement(boardsRouter, {
   async read(input, { tx }) {
     const board = await boards.first(tx);
+    const profiles = await auth.listProfiles(tx);
     return {
-      output: {
-        board,
-        fields: await fields.ordered(tx),
-        profiles: await auth.listProfiles(tx),
-        cards: await cards.listForView(tx, input.view),
-      },
+      output: board
+        ? {
+            board,
+            states: await boards.states(tx, board.id),
+            fields: await fields.list(tx, board.id),
+            profiles,
+            cards: await cards.listForView(tx, board.id, input.view),
+          }
+        : { board: null, states: [], fields: [], profiles, cards: [] },
       event: BoardViewed({ boardId: board?.id ?? null }),
     };
   },
-  async configure(input, { tx }) {
-    const field = await fields.requireField(tx, input.groupingId);
-    const board = await boards.groupBy(tx, await boards.requireMain(tx), field);
+  async setStates(input, { tx }) {
+    const board = await boards.requireBoard(tx);
+    const states = await boards.setStates(tx, board.id, input.states);
     return {
-      output: board,
-      event: BoardGrouped({ boardId: board.id, groupingId: board.groupingId }),
+      output: states,
+      event: BoardStatesChanged({
+        boardId: board.id,
+        stateIds: states.map((state) => state.id),
+      }),
     };
   },
 });

@@ -1,8 +1,8 @@
 import * as boards from "../boards/services";
-import * as fields from "../fields/services";
 import { implement } from "../kernel";
 import {
   CardArchivedChanged,
+  CardAssigneesChanged,
   CardBodyEdited,
   CardCreated,
   CardMoved,
@@ -19,7 +19,8 @@ export const cardsOrchestrator = implement(cardsRouter, {
     return { output: card, event: CardViewed({ cardId: card.id }) };
   },
   async create(input, { tx, deps }) {
-    const card = await cards.create(tx, deps, input);
+    const board = await boards.requireBoard(tx);
+    const card = await cards.create(tx, deps, board.id, input);
     return {
       output: card,
       event: CardCreated({
@@ -38,8 +39,25 @@ export const cardsOrchestrator = implement(cardsRouter, {
         version: card.version,
         changedFields: [
           ...(input.title === undefined ? [] : ["title"]),
-          ...Object.keys(input.values ?? {}),
+          ...Object.keys(input.properties ?? {}),
         ],
+      }),
+    };
+  },
+  async assign(input, { tx, deps, resource }) {
+    const { card, added, removed } = await cards.assign(
+      tx,
+      deps,
+      resource,
+      input.assignees,
+    );
+    return {
+      output: card,
+      event: CardAssigneesChanged({
+        cardId: card.id,
+        assignees: card.assignees,
+        added,
+        removed,
       }),
     };
   },
@@ -51,44 +69,31 @@ export const cardsOrchestrator = implement(cardsRouter, {
     };
   },
   async archive(input, { tx, deps, resource }) {
-    const board = await boards.requireMain(tx);
-    const grouping = await fields.byId(tx, board.groupingId);
-    // Al restaurar, la etiqueta se borra de la tarjeta: se guarda antes para el evento.
-    const restoredStage = input.archived ? null : resource.archivedStage;
-    const card = await cards.archive(
-      tx,
-      deps,
-      resource,
-      input.archived,
-      board,
-      grouping,
-    );
+    const card = await cards.archive(tx, deps, resource, input.archived);
     return {
       output: card,
       event: CardArchivedChanged({
         cardId: card.id,
         archived: card.archived,
-        stage: card.archivedStage ?? restoredStage,
+        // Al restaurar, la etiqueta se borra de la tarjeta: sale de la versión anterior.
+        stage: card.archivedStage ?? resource.archivedStage,
       }),
     };
   },
   async move(input, { tx, deps, resource }) {
-    const board = await boards.requireMain(tx);
-    const from = resource.values[board.groupingId] ?? null;
     const card = await cards.move(
       tx,
       deps,
       resource,
-      board,
-      input.optionId,
+      input.stateId,
       input.beforeId,
     );
     return {
       output: card,
       event: CardMoved({
         cardId: card.id,
-        fromOptionId: typeof from === "string" ? from : null,
-        toOptionId: input.optionId,
+        fromStateId: resource.stateId,
+        toStateId: card.stateId,
         beforeId: input.beforeId,
       }),
     };

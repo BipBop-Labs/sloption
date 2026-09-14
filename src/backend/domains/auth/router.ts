@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { actorSchema, defineEndpoint, defineRouter } from "../../lib/endpoint";
+import { defineEndpoint, defineRouter } from "../../lib/endpoint";
 import { ById, Empty, Ok } from "../schemas";
 import { invitationErrors, profileErrors } from "./errors";
 import {
@@ -13,6 +13,7 @@ import {
   ThemeChanged,
 } from "./events";
 import {
+  Actor,
   InvitationAcceptance,
   IssuedInvitation,
   IssuedKey,
@@ -31,11 +32,11 @@ export const sessionRouter = defineRouter({
   cli: "session",
   endpoints: {
     me: defineEndpoint({
-      doc: "Quién llama. userId es la persona dueña de la clave y agentId el perfil del agente: ese agentId es el que va en un campo people para asignarte algo.",
+      doc: "Quién llama. userId es la persona dueña de la clave y agentId el perfil del agente: ese agentId es el que se asigna a una tarjeta.",
       http: { method: "GET", path: "/me" },
       access: "member",
       input: Empty,
-      output: actorSchema,
+      output: Actor,
       event: null,
     }),
   },

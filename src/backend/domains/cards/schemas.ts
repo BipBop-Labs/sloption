@@ -1,24 +1,26 @@
 import { z } from "zod";
-import { Values } from "../fields/schemas";
+import { Properties } from "../fields/schemas";
 import { Id } from "../schemas";
 
 export const Card = z
   .object({
     id: Id,
+    boardId: Id,
     title: z.string(),
     markdown: z.string(),
     document: z.string().nullable(),
-    values: Values,
+    /** La etapa: la columna del kanban. Null: sin estado. */
+    stateId: Id.nullable(),
+    assignees: z.array(Id),
+    properties: Properties,
     weekly: z.boolean(),
     archived: z.boolean(),
-    /** Etiqueta de la etapa al archivar. Copia, no referencia a la opción. */
-    archivedStage: z.string().nullable().default(null),
+    /** Etiqueta de la etapa al archivar. Copia, no referencia a la etapa. */
+    archivedStage: z.string().nullable(),
     rank: z.number(),
     version: z.number().int(),
     createdAt: z.string(),
     updatedAt: z.string(),
-    sourceId: z.string().nullable(),
-    bodyMissing: z.boolean(),
   })
   .strict();
 export type Card = z.infer<typeof Card>;
@@ -32,31 +34,36 @@ const Title = z.string().trim().min(1).max(500);
 export const NewCard = z
   .object({
     title: Title,
-    values: Values.default({}),
+    stateId: Id.nullable().default(null),
+    assignees: z.array(Id).default([]),
+    properties: Properties.default({}),
     weekly: z.boolean().default(false),
   })
   .strict();
 export type NewCard = z.infer<typeof NewCard>;
 
-/** Título o valores nuevos. `version` es la de la última lectura. */
+/** Título o propiedades nuevas. `version` es la de la última lectura. */
 export const CardChanges = z
   .object({
     id: Id,
     version: z.number().int().positive(),
     title: Title.optional(),
-    values: Values.optional(),
+    properties: Properties.optional(),
   })
   .strict();
+
+/** Las personas asignadas, completas: reemplaza a las anteriores. */
+export const Assignment = z.object({ id: Id, assignees: z.array(Id) }).strict();
 
 export const WeeklyMark = z.object({ id: Id, weekly: z.boolean() }).strict();
 
 export const ArchiveMark = z.object({ id: Id, archived: z.boolean() }).strict();
 
-/** Dónde queda: en la columna `optionId` (null: sin etapa), antes de `beforeId` o al final. */
+/** Dónde queda: en la etapa `stateId` (null: sin estado), antes de `beforeId` o al final. */
 export const CardPlacement = z
   .object({
     id: Id,
-    optionId: Id.nullable(),
+    stateId: Id.nullable(),
     beforeId: Id.nullable().default(null),
   })
   .strict();

@@ -11,13 +11,19 @@ import {
   defineRouter,
   implement,
   type ActionEvent,
-  type Actor,
+  type Caller,
 } from "../src/backend/lib/endpoint";
 import { defineErrors } from "../src/backend/lib/errors";
 import type { Field } from "../src/backend/domains/fields/schemas";
 import { parseValue } from "../src/backend/domains/fields/services";
 
-const member: Actor = {
+interface Member extends Caller {
+  orgId: string;
+  agentId: string | null;
+  apiKeyId: string | null;
+}
+
+const member: Member = {
   userId: "owner",
   orgId: "main",
   role: "member",
@@ -96,7 +102,7 @@ const sampleRouter = defineRouter({
 
 function fixture({
   failPublish = false,
-  actor = member as Actor | null,
+  actor = member as Member | null,
 } = {}) {
   let stored = 0;
   const published: ActionEvent[] = [];
@@ -104,7 +110,7 @@ function fixture({
     ["mine", { id: "mine", ownerId: "owner" }],
     ["theirs", { id: "theirs", ownerId: "someone" }],
   ]);
-  const module = implement<typeof sampleRouter, SampleTx, unknown>(
+  const module = implement<typeof sampleRouter, SampleTx, unknown, Member>(
     sampleRouter,
     {
       async set(input, { tx, fail }) {
@@ -133,7 +139,7 @@ function fixture({
       },
     },
   );
-  const catalog = createCatalog<SampleTx>({
+  const catalog = createCatalog<SampleTx, Member>({
     modules: [module],
     // Confirma el valor y los eventos solo si la operación termina.
     unitOfWork: {
@@ -304,17 +310,17 @@ describe("valores de propiedades", () => {
     ],
   };
   it("acepta vacío y rechaza selecciones que no existen", () => {
-    expect(parseValue(field, null, new Set())).toBeNull();
-    expect(parseValue(field, ["swe"], new Set())).toEqual(["swe"]);
-    expect(() => parseValue(field, ["missing"], new Set())).toThrow();
-    expect(() => parseValue(field, ["swe", "swe"], new Set())).toThrow();
+    expect(parseValue(field, null)).toBeNull();
+    expect(parseValue(field, ["swe"])).toEqual(["swe"]);
+    expect(() => parseValue(field, ["missing"])).toThrow();
+    expect(() => parseValue(field, ["swe", "swe"])).toThrow();
   });
   it("valida fechas de calendario y números finitos", () => {
     expect(() =>
-      parseValue({ ...field, type: "date" }, "2026-02-30", new Set()),
+      parseValue({ ...field, type: "date" }, "2026-02-30"),
     ).toThrow();
     expect(() =>
-      parseValue({ ...field, type: "number" }, Infinity, new Set()),
+      parseValue({ ...field, type: "number" }, Infinity),
     ).toThrow();
   });
 });

@@ -7,13 +7,9 @@ export const fieldErrors = defineErrors({
     kind: "INVALID_INPUT",
     message: "This property has no options",
   },
-  GROUPING_FIELD: {
-    kind: "CONFLICT",
-    message: "Choose another grouping before removing this property",
-  },
 });
 
-/** Los lanza `validateValues`: todo endpoint que escribe valores los declara. */
+/** Los lanza `validateProperties`: todo endpoint que escribe propiedades los declara. */
 export const valueErrors = defineErrors({
   UNKNOWN_PROPERTY: { kind: "INVALID_INPUT", message: "Unknown property" },
   INVALID_VALUE: { kind: "INVALID_INPUT", message: "Invalid property value" },

@@ -7,7 +7,6 @@ export const FieldType = z.enum([
   "date",
   "select",
   "multiSelect",
-  "people",
 ]);
 export type FieldType = z.infer<typeof FieldType>;
 
@@ -31,16 +30,12 @@ export const Value = z.union([
 ]);
 export type Value = z.infer<typeof Value>;
 
-/** Los valores de una tarjeta, por id de propiedad. */
-export const Values = z.record(z.string(), Value);
+/** Los valores de las propiedades de una tarjeta, por id de propiedad. */
+export const Properties = z.record(z.string(), Value);
+export type Properties = z.infer<typeof Properties>;
 
-// `people` queda afuera a propósito: el campo de responsables lo siembra el seed
-// y su valor son perfiles, no opciones que alguien pueda escribir.
 export const NewField = Field.omit({ id: true })
-  .extend({
-    type: FieldType.exclude(["people"]),
-    options: z.array(FieldOption).default([]),
-  })
+  .extend({ options: z.array(FieldOption).default([]) })
   .strict();
 
 /** Nombre y opciones nuevas. Reemplazar las opciones también las reordena. */

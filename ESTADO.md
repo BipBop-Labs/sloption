@@ -27,7 +27,7 @@
   solo para admins. Diálogo de confirmación e iconos reutilizables.
 - Columnas reordenables con el mismo gesto que las tarjetas: se agarran por el
   encabezado, salen del flujo y las vecinas abren el hueco donde caerían.
-  Alt+flechas para el teclado. Es `field.update` con las opciones en otro orden,
+  Alt+flechas para el teclado. Es `boards.setStates` con las etapas en otro orden,
   así que la CLI reordena igual; el tablero se dibuja optimista.
 - Eliminar una etapa siempre pide escribir su nombre (`challenge` de
   `useConfirm`). La columna solo muestra las tarjetas de la vista y el filtro
@@ -70,8 +70,9 @@ organizaciones: hoy no tendrían nada que decidir.
 ## Datos locales
 
 El tablero viejo de Notion se descartó. El seed crea el admin inicial de `.env` y un
-tablero base con las etapas not started, in progress y done, más Prioridad y
-Encargado(s). Solo corre si todavía no hay un admin con acceso.
+tablero base con las etapas not started, in progress y done, más la propiedad
+Prioridad. Solo corre si todavía no hay un admin con acceso. La base de desarrollo se
+vació el 2026-09-14 con la migración nueva.
 
 El frontend corre en http://localhost:5173. `.env` contiene las credenciales locales;
 el archivo está ignorado por Git. README.md explica arranque, CLI y configuración para
@@ -98,14 +99,44 @@ Coolify.
 
 ## Próximo paso
 
-Recrear los webhooks con los nombres de evento nuevos (`catalog read` los lista). La base
-de desarrollo actual se sembró antes del cambio y todavía tiene las siete etapas viejas:
-para ver el tablero base hay que vaciarla (`docker compose -f docker-compose.dev.yml
-down -v` y `./dev`). Después, usar la app y recoger ajustes del equipo.
+Probar a mano el tablero con las etapas nuevas: crear, asignar, filtrar por responsable
+y prioridad, agregar y reordenar etapas. Después, usar la app y recoger ajustes del
+equipo.
 
 ## Bitácora
 
 Formato: fecha — qué cambió. Agregá arriba, no abajo.
+
+### 2026-09-14 — Tablas reales por dominio, sin json
+
+- **Se fue `records`**, la tabla genérica con un JSONB por entidad. Ahora hay 16 tablas
+  con foreign keys, cada una en el `models.ts` de su dominio, incluidas las de BetterAuth.
+  Migraciones reiniciadas: `drizzle/0000_init.sql`. La base de desarrollo se vació.
+- **Los servicios consultan Drizzle directo** (`tx.sql`). Se fueron el store genérico
+  (`get`/`list`/`put` por colección) y el mapa `Entities`.
+- **Tarjeta híbrida:** columnas base (`title`, `board_id`, `state_id`, `rank`, `weekly`,
+  `archived`…), `card_assignees` con foreign key a `profiles`, y un solo jsonb,
+  `cards.properties`, para las propiedades que define cada tablero, validado contra
+  `fields`.
+- **Las columnas del kanban son los estados del tablero** (`board_states`). Se fue la
+  agrupación configurable: `boards.configure` y `groupingId` desaparecen, y
+  `boards.setStates` agrega, reordena y quita etapas. Quitar una deja sus tarjetas sin
+  estado por la foreign key.
+- **Asignar es un endpoint**: `cards.assign` emite `cards.assigneesChanged.v1` con quién
+  entró y quién salió. Es el caso de un agente que se entera.
+- **Filtros del frontend:** por responsable y por propiedades de selección; nunca por
+  etapa.
+- **Webhooks sin persistir:** entrega en memoria después del commit, con reintentos. Se
+  fueron `deliveries` y el worker; un reinicio pierde lo pendiente.
+- **`lib/` no define modelos:** el `Actor` pasó a `auth/schemas.ts` y `lib/` solo conoce
+  `{ userId, role }`. Tests de arquitectura nuevos: `models.ts` solo importa modelos y
+  `lib/` no toca Drizzle.
+- **Se fueron `sourceId` y `bodyMissing`**, restos de la importación de Notion.
+- Los tests unitarios con store en memoria (`archive`, `identity`) no aplican con Drizzle
+  directo: archivar quedó como función pura (`archiveTransition`, en `tests/cards.test.ts`)
+  y auth se cubre en los E2E.
+
+Verificación: typecheck, build, 41 tests unitarios y E2E 5/5 contra la base nueva.
 
 ### 2026-09-14 — Esquemas en `schemas.ts`, sin `model.ts`
 

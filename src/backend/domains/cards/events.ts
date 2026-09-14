@@ -25,6 +25,19 @@ export const CardUpdated = defineEvent("cards.updated.v1", {
   refreshesBoard: true,
 });
 
+/** El caso que motivó los webhooks: a un agente le asignan una tarjeta y se entera. */
+export const CardAssigneesChanged = defineEvent("cards.assigneesChanged.v1", {
+  data: z
+    .object({
+      cardId: Id,
+      assignees: z.array(Id),
+      added: z.array(Id),
+      removed: z.array(Id),
+    })
+    .strict(),
+  refreshesBoard: true,
+});
+
 export const CardWeeklyChanged = defineEvent("cards.weeklyChanged.v1", {
   data: z.object({ cardId: Id, weekly: z.boolean() }).strict(),
   refreshesBoard: true,
@@ -46,8 +59,8 @@ export const CardMoved = defineEvent("cards.moved.v1", {
   data: z
     .object({
       cardId: Id,
-      fromOptionId: Id.nullable(),
-      toOptionId: Id.nullable(),
+      fromStateId: Id.nullable(),
+      toStateId: Id.nullable(),
       beforeId: Id.nullable(),
     })
     .strict(),

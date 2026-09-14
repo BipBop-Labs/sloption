@@ -1,6 +1,12 @@
 import "./CardDialog.css";
 import { lazy, Suspense, useState } from "react";
-import type { Card, Field, Profile, Value } from "@/backend/domains/kernel";
+import type {
+  BoardState,
+  Card,
+  Field,
+  Profile,
+  Value,
+} from "@/backend/domains/kernel";
 import type { Update } from "@/frontend/lib/update";
 import {
   Chip,
@@ -15,20 +21,14 @@ const DocumentEditor = lazy(() => import("../DocumentEditor/DocumentEditor"));
 function PropertyInput({
   field,
   current,
-  profiles,
   save,
 }: {
   field: Field;
   current: Value | undefined;
-  profiles: Profile[];
   save(value: Value): void;
 }) {
-  if (
-    field.type === "select" ||
-    field.type === "multiSelect" ||
-    field.type === "people"
-  ) {
-    const multiple = field.type !== "select";
+  if (field.type === "select" || field.type === "multiSelect") {
+    const multiple = field.type === "multiSelect";
     return (
       <DropdownSelect
         label={field.name}
@@ -43,14 +43,7 @@ function PropertyInput({
               ? current
               : ""
         }
-        options={
-          field.type === "people"
-            ? profiles.map((profile) => ({
-                id: profile.id,
-                label: profile.name,
-              }))
-            : field.options
-        }
+        options={field.options}
         onChange={(next) => save(next === "" ? null : next)}
       />
     );
@@ -82,6 +75,7 @@ function PropertyInput({
 }
 export function CardDialog({
   card,
+  states,
   fields,
   profiles,
   close,
@@ -89,6 +83,7 @@ export function CardDialog({
   onError,
 }: {
   card: Card;
+  states: BoardState[];
   fields: Field[];
   profiles: Profile[];
   close(): void;
@@ -179,36 +174,67 @@ export function CardDialog({
           Esta semana
         </button>
       </div>
-      {card.archived && card.archivedStage && (
+      {card.archived ? (
+        card.archivedStage && (
+          <div className="property-row">
+            <span>Última etapa</span>
+            <Chip color={chipColor(card.archivedStage)}>
+              {card.archivedStage}
+            </Chip>
+          </div>
+        )
+      ) : (
         <div className="property-row">
-          <span>Última etapa</span>
-          <Chip color={chipColor(card.archivedStage)}>
-            {card.archivedStage}
-          </Chip>
+          <span>Estado</span>
+          <DropdownSelect
+            label="Estado"
+            clearable
+            value={card.stateId ?? ""}
+            options={states}
+            onChange={(next) => {
+              void update("cards.move", {
+                id: card.id,
+                stateId: typeof next === "string" && next ? next : null,
+                beforeId: null,
+              });
+            }}
+          />
         </div>
       )}
+      <div className="property-row">
+        <span>Encargado(s)</span>
+        <DropdownSelect
+          label="Encargado(s)"
+          multiple
+          value={card.assignees}
+          options={profiles.map((profile) => ({
+            id: profile.id,
+            label: profile.name,
+          }))}
+          onChange={(next) => {
+            void update("cards.assign", {
+              id: card.id,
+              assignees: Array.isArray(next) ? next : next ? [next] : [],
+            });
+          }}
+        />
+      </div>
       {fields.map((field) => (
         <div className="property-row" key={field.id}>
           <span>{field.name}</span>
           <PropertyInput
             field={field}
-            current={card.values[field.id]}
-            profiles={profiles}
+            current={card.properties[field.id]}
             save={(value) => {
               void update("cards.update", {
                 id: card.id,
                 version: card.version,
-                values: { [field.id]: value },
+                properties: { [field.id]: value },
               });
             }}
           />
         </div>
       ))}
-      {card.bodyMissing && (
-        <p className="help">
-          El export de Notion no incluye el cuerpo de esta tarjeta.
-        </p>
-      )}
       <Suspense fallback={<p>Cargando editor…</p>}>
         <DocumentEditor
           card={card}

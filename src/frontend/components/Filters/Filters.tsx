@@ -1,7 +1,12 @@
 import "./Filters.css";
 import { useNavigate } from "@tanstack/react-router";
 import type { Field, Profile } from "@/backend/domains/kernel";
-import { activeFilter, EMPTY, type BoardSearch } from "@/frontend/lib/filters";
+import {
+  activeFilter,
+  ASSIGNEES,
+  EMPTY,
+  type BoardSearch,
+} from "@/frontend/lib/filters";
 import { DropdownSelect } from "@/frontend/ui";
 
 export function Filters({
@@ -16,15 +21,19 @@ export function Filters({
   hidden: number;
 }) {
   const navigate = useNavigate();
-  function set(key: string, value: string | undefined) {
+  function set(key: string, value: string | string[] | undefined) {
     void navigate({
       to: "/",
-      search: (previous: BoardSearch) => ({ ...previous, [key]: value }),
+      search: (previous: BoardSearch) => ({
+        ...previous,
+        [key]: (Array.isArray(value) ? value : value ? [value] : []).join(",") || undefined,
+      }),
       replace: true,
     });
   }
   const active =
     !!search.q ||
+    activeFilter(search, ASSIGNEES).length > 0 ||
     filterable.some((field) => activeFilter(search, field.id).length);
   return (
     <div className="filters">
@@ -36,6 +45,21 @@ export function Filters({
         value={String(search.q ?? "")}
         onChange={(event) => set("q", event.target.value || undefined)}
       />
+      <DropdownSelect
+        label="Encargado(s)"
+        prefix="Encargado(s)"
+        multiple
+        placeholder="Cualquiera"
+        value={activeFilter(search, ASSIGNEES)}
+        options={[
+          { id: EMPTY, label: "Sin asignar" },
+          ...profiles.map((profile) => ({
+            id: profile.id,
+            label: profile.name,
+          })),
+        ]}
+        onChange={(value) => set(ASSIGNEES, value)}
+      />
       {filterable.map((field) => (
         <DropdownSelect
           key={field.id}
@@ -46,22 +70,9 @@ export function Filters({
           value={activeFilter(search, field.id)}
           options={[
             { id: EMPTY, label: `Sin ${field.name.toLowerCase()}` },
-            ...(field.type === "people"
-              ? profiles.map((profile) => ({
-                  id: profile.id,
-                  label: profile.name,
-                }))
-              : field.options.map((option) => ({
-                  id: option.id,
-                  label: option.label,
-                }))),
+            ...field.options,
           ]}
-          onChange={(value) =>
-            set(
-              field.id,
-              (Array.isArray(value) ? value : [value]).join(",") || undefined,
-            )
-          }
+          onChange={(value) => set(field.id, value)}
         />
       ))}
       {active && (

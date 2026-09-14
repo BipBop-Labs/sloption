@@ -35,7 +35,7 @@ export const CardTile = memo(function CardTile({
   const release = useRef<(() => void) | null>(null);
   const prefetch = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const priority = fields.find((field) => field.id === "priority");
-  const assignees = card.values.assignees;
+  const priorityValue = card.properties.priority;
   function start(event: React.PointerEvent<HTMLElement>) {
     if ((event.target as HTMLElement).closest("button") || event.button !== 0)
       return;
@@ -129,7 +129,12 @@ export const CardTile = memo(function CardTile({
     const target = state.drop ?? null;
     drop(state.active);
     if (state.active && state.moved) {
-      if (target) void update("cards.move", { id: card.id, ...target });
+      if (target)
+        void update("cards.move", {
+          id: card.id,
+          stateId: target.optionId,
+          beforeId: target.beforeId,
+        });
     } else if (
       state.touch &&
       Math.abs(event.clientX - state.x) > 70 &&
@@ -175,7 +180,7 @@ export const CardTile = memo(function CardTile({
                 : tiles[index + 2]?.dataset.cardId;
             void update("cards.move", {
               id: card.id,
-              optionId: column?.dataset.option || null,
+              stateId: column?.dataset.option || null,
               beforeId: beforeId ?? null,
             });
           } else {
@@ -186,7 +191,7 @@ export const CardTile = memo(function CardTile({
             if (target instanceof HTMLElement)
               void update("cards.move", {
                 id: card.id,
-                optionId: target.dataset.option || null,
+                stateId: target.dataset.option || null,
               });
           }
           return;
@@ -209,19 +214,15 @@ export const CardTile = memo(function CardTile({
     >
       <h3 style={{ viewTransitionName: `title-${card.id}` }}>{card.title}</h3>
       <div className="card-meta">
-        {typeof card.values.priority === "string" && (
-          <Chip color={chipColor(card.values.priority)}>
+        {typeof priorityValue === "string" && (
+          <Chip color={chipColor(priorityValue)}>
             {
-              priority?.options.find(
-                (option) => option.id === card.values.priority,
-              )?.label
+              priority?.options.find((option) => option.id === priorityValue)
+                ?.label
             }
           </Chip>
         )}
-        <Avatars
-          ids={Array.isArray(assignees) ? assignees : []}
-          people={profiles}
-        />
+        <Avatars ids={card.assignees} people={profiles} />
         {card.weekly && <Chip variant="highlight">Esta semana</Chip>}
       </div>
     </article>

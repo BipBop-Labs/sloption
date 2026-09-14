@@ -1,31 +1,29 @@
-import { eventSchema, type Actor } from "../../lib/endpoint";
+import { and, asc, count, eq, inArray, isNotNull } from "drizzle-orm";
+import { eventSchema } from "../../lib/endpoint";
 import { raise } from "../../lib/errors";
 import type { Deps, Tx } from "../kernel";
 import { invitationErrors, profileErrors } from "./errors";
 import { SignedIn, SignedOut } from "./events";
-import type { Invitation, Key, Profile, Role } from "./schemas";
+import { apiKeys, invitations, profiles } from "./models";
+import type { Actor, Invitation, Key, Profile, Role, Theme } from "./schemas";
 
 /** Una organización por deploy, por ahora. Ver Roadmap en ESTADO.md. */
 const ORG_ID = "main";
 
-/**
- * Una API key actúa como su dueño y con sus permisos; el agente queda anotado
- * aparte para que los eventos distingan quién movió qué. Una key revocada no
- * autentica.
- */
+/** Una key revocada no autentica. La key actúa como su dueño y anota al agente. */
 export async function fromApiKey(tx: Tx, digest: string): Promise<Actor | null> {
-  const key = (await tx.list("keys")).find(
-    (item) => item.digest === digest && !item.revoked,
-  );
-  if (!key) return null;
-  const owner = await tx.get("profiles", key.ownerId);
-  return owner
+  const [row] = await tx.sql
+    .select({ key: apiKeys, owner: profiles })
+    .from(apiKeys)
+    .innerJoin(profiles, eq(profiles.id, apiKeys.ownerId))
+    .where(and(eq(apiKeys.digest, digest), eq(apiKeys.revoked, false)));
+  return row
     ? {
-        userId: owner.id,
+        userId: row.owner.id,
         orgId: ORG_ID,
-        role: owner.role,
-        agentId: key.agentId,
-        apiKeyId: key.id,
+        role: row.owner.role,
+        agentId: row.key.agentId,
+        apiKeyId: row.key.id,
       }
     : null;
 }
@@ -35,8 +33,8 @@ export async function fromSession(
   tx: Tx,
   authUserId: string,
 ): Promise<Actor | null> {
-  const profile = (await tx.list("profiles")).find(
-    (item) => item.authUserId === authUserId,
+  const profile = await one(
+    tx.sql.select().from(profiles).where(eq(profiles.authUserId, authUserId)),
   );
   return profile
     ? {
@@ -49,13 +47,15 @@ export async function fromSession(
     : null;
 }
 
-export const listProfiles = (tx: Tx) => tx.list("profiles");
-export const profileById = (tx: Tx, profileId: string) =>
-  tx.get("profiles", profileId);
-
-export async function profileIds(tx: Tx) {
-  return new Set((await listProfiles(tx)).map((profile) => profile.id));
+async function one<T>(query: Promise<T[]>): Promise<T | null> {
+  return (await query)[0] ?? null;
 }
+
+export const listProfiles = (tx: Tx): Promise<Profile[]> =>
+  tx.sql.select().from(profiles).orderBy(asc(profiles.name));
+
+export const profileById = (tx: Tx, profileId: string): Promise<Profile | null> =>
+  one(tx.sql.select().from(profiles).where(eq(profiles.id, profileId)));
 
 export async function requireProfile(tx: Tx, profileId: string) {
   return (
@@ -64,29 +64,33 @@ export async function requireProfile(tx: Tx, profileId: string) {
   );
 }
 
-export async function setTheme(
-  tx: Tx,
-  profileId: string,
-  theme: NonNullable<Profile["theme"]>,
-) {
+/** Las personas a asignar tienen que existir. */
+export async function assertProfiles(tx: Tx, profileIds: readonly string[]) {
+  const wanted = new Set(profileIds);
+  if (!wanted.size) return;
+  const found = await tx.sql
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(inArray(profiles.id, [...wanted]));
+  if (found.length !== wanted.size) raise(profileErrors, "UNKNOWN_PROFILE");
+}
+
+export async function setTheme(tx: Tx, profileId: string, theme: Theme) {
   const profile = await requireProfile(tx, profileId);
-  profile.theme = theme;
-  await tx.put("profiles", profile);
-  return profile;
+  await tx.sql.update(profiles).set({ theme }).where(eq(profiles.id, profileId));
+  return { ...profile, theme };
 }
 
 export async function setRole(tx: Tx, profile: Profile, role: Role) {
-  if (
-    profile.role === "admin" &&
-    role === "member" &&
-    (await listProfiles(tx)).filter(
-      (item) => item.role === "admin" && item.authUserId,
-    ).length <= 1
-  )
-    raise(profileErrors, "LAST_ADMIN");
-  profile.role = role;
-  await tx.put("profiles", profile);
-  return profile;
+  if (profile.role === "admin" && role === "member") {
+    const [active] = await tx.sql
+      .select({ admins: count() })
+      .from(profiles)
+      .where(and(eq(profiles.role, "admin"), isNotNull(profiles.authUserId)));
+    if ((active?.admins ?? 0) <= 1) raise(profileErrors, "LAST_ADMIN");
+  }
+  await tx.sql.update(profiles).set({ role }).where(eq(profiles.id, profile.id));
+  return { ...profile, role };
 }
 
 export async function createInvitation(
@@ -106,19 +110,26 @@ export async function createInvitation(
     digest: deps.secrets.digest(token),
     used: false,
   };
-  await tx.put("invitations", invitation);
+  await tx.sql.insert(invitations).values(invitation);
   return { invitation, token };
 }
 
-/** Liga una identidad sin acceso, nueva o importada, a una cuenta de BetterAuth. */
+/** Liga una identidad sin acceso, nueva o existente, a una cuenta de BetterAuth. */
 export async function acceptInvitation(
   tx: Tx,
   deps: Deps,
   input: { token: string; password: string; name: string },
 ) {
-  const digest = deps.secrets.digest(input.token);
-  const invitation = (await tx.list("invitations")).find(
-    (item) => item.digest === digest && !item.used,
+  const invitation = await one(
+    tx.sql
+      .select()
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.digest, deps.secrets.digest(input.token)),
+          eq(invitations.used, false),
+        ),
+      ),
   );
   if (!invitation) return raise(invitationErrors, "INVALID_INVITATION");
   const existing = invitation.profileId
@@ -130,29 +141,46 @@ export async function acceptInvitation(
     input.password,
     existing?.name ?? input.name,
   );
-  const profile: Profile = existing ?? {
-    id: deps.newId(),
-    name: input.name,
-    role: invitation.role,
-    authUserId: null,
-    kind: "person",
-    ownerId: null,
-  };
-  profile.authUserId = authUserId;
-  profile.role = invitation.role;
-  await tx.put("profiles", profile);
-  invitation.used = true;
-  await tx.put("invitations", invitation);
+  let profile: Profile;
+  if (existing) {
+    profile = { ...existing, authUserId, role: invitation.role };
+    await tx.sql
+      .update(profiles)
+      .set({ authUserId, role: invitation.role })
+      .where(eq(profiles.id, existing.id));
+  } else {
+    profile = {
+      id: deps.newId(),
+      name: input.name,
+      role: invitation.role,
+      kind: "person",
+      theme: null,
+      authUserId,
+      ownerId: null,
+    };
+    await tx.sql.insert(profiles).values(profile);
+  }
+  await tx.sql
+    .update(invitations)
+    .set({ used: true })
+    .where(eq(invitations.id, invitation.id));
   return { invitation, profile };
 }
 
-export const keyById = (tx: Tx, keyId: string) => tx.get("keys", keyId);
+export const keyById = (tx: Tx, keyId: string): Promise<Key | null> =>
+  one(tx.sql.select().from(apiKeys).where(eq(apiKeys.id, keyId)));
 
-export async function listKeys(tx: Tx, ownerId: string) {
-  return (await tx.list("keys"))
-    .filter((key) => key.ownerId === ownerId)
-    .map(({ digest: _digest, ...key }) => key);
-}
+export const listKeys = (tx: Tx, ownerId: string) =>
+  tx.sql
+    .select({
+      id: apiKeys.id,
+      ownerId: apiKeys.ownerId,
+      agentId: apiKeys.agentId,
+      name: apiKeys.name,
+      revoked: apiKeys.revoked,
+    })
+    .from(apiKeys)
+    .where(eq(apiKeys.ownerId, ownerId));
 
 /** Cada key tiene su agente: un perfil propio que se puede asignar a tarjetas. */
 export async function createKey(
@@ -163,13 +191,14 @@ export async function createKey(
 ) {
   const token = `slop_${deps.secrets.create()}`;
   const agentId = deps.newId();
-  await tx.put("profiles", {
+  await tx.sql.insert(profiles).values({
     id: agentId,
     name,
     role: "member",
+    kind: "agent",
+    theme: null,
     authUserId: null,
     ownerId,
-    kind: "agent",
   });
   const key: Key = {
     id: deps.newId(),
@@ -179,13 +208,12 @@ export async function createKey(
     digest: deps.secrets.digest(token),
     revoked: false,
   };
-  await tx.put("keys", key);
+  await tx.sql.insert(apiKeys).values(key);
   return { key, token };
 }
 
 export async function revokeKey(tx: Tx, key: Key) {
-  key.revoked = true;
-  await tx.put("keys", key);
+  await tx.sql.update(apiKeys).set({ revoked: true }).where(eq(apiKeys.id, key.id));
 }
 
 export function sessionEvent(

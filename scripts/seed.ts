@@ -1,61 +1,65 @@
 import { randomUUID } from "node:crypto";
+import { and, eq, isNotNull } from "drizzle-orm";
+import { profiles } from "../src/backend/domains/auth/models";
+import { boardStates, boards } from "../src/backend/domains/boards/models";
+import { fieldOptions, fields } from "../src/backend/domains/fields/models";
+import type { Tx } from "../src/backend/domains/kernel";
 import { pool, store } from "../src/backend/server/context";
+
 const email = process.env.SEED_ADMIN_EMAIL;
 const password = process.env.SEED_ADMIN_PASSWORD;
 if (!email || !password || password.length < 12)
   throw new Error(
     "Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD (at least 12 characters)",
   );
-const existing = await store.transaction(async (tx) =>
-  (await tx.list("profiles")).some(
-    (profile) => profile.role === "admin" && profile.authUserId,
-  ),
-);
+
+const findAdmin = (tx: Tx) =>
+  tx.sql
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(and(eq(profiles.role, "admin"), isNotNull(profiles.authUserId)))
+    .limit(1);
+
+/** El admin inicial y un tablero base. Solo corre si todavía no hay un admin con acceso. */
+const existing = (await store.transaction(findAdmin)).length > 0;
 if (!existing) {
   await store.transaction(async (tx) => {
-    if (
-      (await tx.list("profiles")).some(
-        (profile) => profile.role === "admin" && profile.authUserId,
-      )
-    )
-      return;
+    if ((await findAdmin(tx)).length) return;
     const name = process.env.SEED_ADMIN_NAME ?? "Administrador";
     const authUserId = await tx.createAccount(email, password, name);
-    const profile = {
+    await tx.sql.insert(profiles).values({
       id: randomUUID(),
       name,
-      role: "admin" as const,
+      role: "admin",
+      kind: "person",
+      theme: null,
       authUserId,
-      kind: "person" as const,
       ownerId: null,
-    };
-    await tx.put("profiles", profile);
-    await tx.put("boards", {
-      id: "main",
-      name: "Tareas",
-      groupingId: "status",
     });
-    await tx.put("fields", {
-      id: "status",
-      name: "Estado",
-      type: "select",
-      options: ["not started", "in progress", "done"].map((label) => ({
-        id: label,
+    await tx.sql.insert(boards).values({ id: "main", name: "Tareas" });
+    await tx.sql.insert(boardStates).values(
+      ["not started", "in progress", "done"].map((label, position) => ({
+        id: randomUUID(),
+        boardId: "main",
         label,
+        position,
       })),
-    });
-    await tx.put("fields", {
+    );
+    await tx.sql.insert(fields).values({
       id: "priority",
+      boardId: "main",
       name: "Prioridad",
       type: "select",
-      options: ["alta", "media", "baja"].map((label) => ({ id: label, label })),
+      position: 0,
     });
-    await tx.put("fields", {
-      id: "assignees",
-      name: "Encargado(s)",
-      type: "people",
-      options: [],
-    });
+    await tx.sql.insert(fieldOptions).values(
+      ["alta", "media", "baja"].map((label, position) => ({
+        fieldId: "priority",
+        id: randomUUID(),
+        label,
+        position,
+      })),
+    );
   });
 }
 await pool.end();

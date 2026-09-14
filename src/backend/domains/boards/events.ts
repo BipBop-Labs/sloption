@@ -7,7 +7,8 @@ export const BoardViewed = defineEvent("boards.viewed.v1", {
   refreshesBoard: false,
 });
 
-export const BoardGrouped = defineEvent("boards.grouped.v1", {
-  data: z.object({ boardId: Id, groupingId: Id }).strict(),
+/** Etapas agregadas, renombradas, reordenadas o borradas. `stateIds` es el orden nuevo. */
+export const BoardStatesChanged = defineEvent("boards.statesChanged.v1", {
+  data: z.object({ boardId: Id, stateIds: z.array(Id) }).strict(),
   refreshesBoard: true,
 });

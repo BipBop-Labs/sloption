@@ -15,8 +15,9 @@ stored: webhooks consume them.
 
 | Endpoints | Access | Events |
 |---|---|---|
-| boards.read, boards.configure | member / admin | boards.viewed, boards.grouped |
+| boards.read, boards.setStates | member / admin | boards.viewed, boards.statesChanged |
 | cards.read, cards.create, cards.update | member | cards.viewed, cards.created, cards.updated |
+| cards.assign | member | cards.assigneesChanged (with added and removed) |
 | cards.week, cards.archive, cards.move | member | cards.weeklyChanged, cards.archivedChanged, cards.moved |
 | cards.applyDocument | member | cards.bodyEdited |
 | fields.create, fields.update, fields.remove | admin | fields.created, fields.updated, fields.removed |
@@ -29,6 +30,8 @@ stored: webhooks consume them.
 | session.me | member | none |
 | catalog.read | member | catalog.viewed |
 
-All events are `.v1`. Sign-in and sign-out go through BetterAuth (`/api/auth/*`, CLI
-`session login` and `session logout`) and emit `auth.signedIn.v1` and
-`auth.signedOut.v1` with IP and user agent.
+A card's columns are the board's states (`stateId`); its assignees are a relation
+(`cards.assign`); the rest are board-defined properties (`properties`). All events are
+`.v1`. Sign-in and sign-out go through BetterAuth (`/api/auth/*`, CLI `session login` and
+`session logout`) and emit `auth.signedIn.v1` and `auth.signedOut.v1` with IP and user
+agent.

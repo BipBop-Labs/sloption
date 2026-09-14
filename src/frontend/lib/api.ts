@@ -1,7 +1,15 @@
 import { QueryClient } from "@tanstack/react-query";
-import type { Card, Field, Profile, Board } from "@/backend/domains/kernel";
+import type {
+  Board,
+  BoardState,
+  Card,
+  Field,
+  Profile,
+} from "@/backend/domains/kernel";
 export interface BoardData {
   board: Board;
+  /** Las etapas del tablero, en orden: son las columnas. */
+  states: BoardState[];
   fields: Field[];
   profiles: Profile[];
   cards: Card[];

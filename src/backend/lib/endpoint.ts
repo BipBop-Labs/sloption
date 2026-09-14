@@ -3,24 +3,23 @@ import type { ErrorSpecs } from "./errors";
 
 const eventTypePattern = /^[a-z][a-zA-Z]*\.[a-zA-Z]+\.v[1-9][0-9]*$/;
 
-export const actorSchema = z
-  .object({
-    userId: z.string().min(1),
-    /** Hoy siempre "main": una organización por deploy. Ver Roadmap en ESTADO.md. */
-    orgId: z.string().min(1),
-    role: z.enum(["admin", "member"]),
-    agentId: z.string().min(1).nullable(),
-    apiKeyId: z.string().min(1).nullable(),
-  })
-  .strict();
-export type Actor = z.infer<typeof actorSchema>;
+/**
+ * Lo mínimo que el runner sabe de quién llama: lo justo para autorizar por rol y
+ * por dueño. Quién es de verdad —agente, organización, key— lo define auth.
+ */
+export interface Caller {
+  userId: string;
+  role: string;
+}
 
 export const eventSchema = z
   .object({
     id: z.string().uuid(),
     type: z.string().regex(eventTypePattern),
-    /** Null en endpoints públicos: quien acepta una invitación todavía no tiene sesión. */
-    actor: actorSchema.nullable(),
+    /** Quién lo causó, tal como lo resolvió auth. Null en endpoints públicos. */
+    actor: z
+      .looseObject({ userId: z.string().min(1), role: z.string() })
+      .nullable(),
     occurredAt: z.iso.datetime(),
     data: z.record(z.string(), z.json()),
   })
@@ -70,7 +69,7 @@ export interface Scope<Input, Resource> {
   load(transaction: never, id: string): Promise<Resource | null>;
   from(input: Input): string;
   /** `false` responde FORBIDDEN sin llegar al orquestador. */
-  allow?(actor: Actor, resource: Resource): boolean;
+  allow?(actor: Caller, resource: Resource): boolean;
 }
 
 export interface EndpointSpec<
@@ -130,7 +129,7 @@ type ResourceOf<Ep extends AnyEndpoint> =
   // oxlint-disable-next-line no-explicit-any
   NonNullable<Ep["scope"]> extends Scope<any, infer R> ? R : never;
 
-export interface Context<Ep extends AnyEndpoint, Tx, Deps> {
+export interface Context<Ep extends AnyEndpoint, Tx, Deps, Actor extends Caller> {
   actor: Ep["access"] extends "public" ? Actor | null : Actor;
   tx: Tx;
   deps: Deps;
@@ -149,10 +148,10 @@ export type Result<Ep extends AnyEndpoint> = Ep["event"] extends (
   : { output: z.input<Ep["output"]> };
 
 /** Una función por endpoint del router, ni una más ni una menos. */
-export type Handlers<Rt extends RouterSpec, Tx, Deps> = {
+export type Handlers<Rt extends RouterSpec, Tx, Deps, Actor extends Caller> = {
   [K in keyof Rt["endpoints"]]: (
     input: z.output<Rt["endpoints"][K]["input"]>,
-    context: Context<Rt["endpoints"][K], Tx, Deps>,
+    context: Context<Rt["endpoints"][K], Tx, Deps, Actor>,
   ) => Promise<Result<Rt["endpoints"][K]>>;
 };
 
@@ -164,9 +163,9 @@ export interface Module {
   >;
 }
 
-export function implement<Rt extends RouterSpec, Tx, Deps>(
+export function implement<Rt extends RouterSpec, Tx, Deps, Actor extends Caller>(
   router: Rt,
-  handlers: Handlers<Rt, Tx, Deps>,
+  handlers: Handlers<Rt, Tx, Deps, Actor>,
 ): Module {
   return { router, handlers: handlers as unknown as Module["handlers"] };
 }

@@ -22,9 +22,10 @@ un proyecto aparte, se instala desde acá.
 ## Arquitectura elegida: hexagonal, cortada por dominio
 
 Ports & adapters, con el backend dividido en dominios verticales: auth, boards, cards,
-fields, webhooks y assets. Los dominios no importan React, Hono, BetterAuth ni
-Drizzle. Los adaptadores traducen protocolos y almacenamiento; el composition root
-conecta sus implementaciones. La CLI usa la API HTTP, que invoca exactamente el mismo
+fields, webhooks y assets. Los dominios no importan React, Hono ni BetterAuth. Sí usan
+Drizzle: cada uno define sus tablas en `models.ts` y sus servicios las consultan directo,
+sin repositorios ni un store genérico en el medio. Los adaptadores traducen protocolos;
+el composition root conecta sus implementaciones. La CLI usa la API HTTP, que invoca exactamente el mismo
 catálogo que la web.
 
 Se evaluaron arquitectura por capas centrada en el framework y arquitectura hexagonal.
@@ -67,10 +68,13 @@ emite, y la CLI funciona desde cualquier máquina con una API key. Saca las ruta
 
 `src/backend/domains/<dominio>/`:
 
+- `models.ts`: las tablas Drizzle del dominio. Es el modelo que se persiste; las
+  migraciones salen de acá (`drizzle.config.ts` lee `domains/*/models.ts`).
 - `router.ts`: solo definiciones y su doc. Sin lógica.
 - `orchestrator.ts`: una función por endpoint; `implement` obliga a implementarlas
   todas. Devuelve el output y el payload del evento.
-- `services.ts`: operaciones reutilizables que reciben la transacción.
+- `services.ts`: operaciones reutilizables que reciben la transacción y consultan con
+  `tx.sql`.
 - `schemas.ts`: todos los esquemas zod del dominio, cada uno con su tipo bajo el mismo
   nombre (`Card`, `NewCard`, `CardPlacement`). Se nombran por lo que son, no por su rol
   en un endpoint. El router solo referencia nombres; las listas se arman ahí mismo
@@ -78,14 +82,16 @@ emite, y la CLI funciona desde cualquier máquina con una API key. Saca las ruta
 - `events.ts`: los eventos que emite el dominio.
 - `errors.ts`.
 
-`domains/kernel.ts` es lo compartido: el mapa de colecciones, la transacción y las
-dependencias. `domains/schemas.ts` tiene los esquemas base (`Id`, `ById`, `Empty`, `Ok`).
-No hay `model.ts`: la forma de guardar es asunto del adaptador de Postgres. Reglas, verificadas por `tests/architecture.test.ts`:
+`domains/kernel.ts` es lo compartido: la transacción (`Tx`, con `sql`, `afterCommit` y
+`notify`) y las dependencias. `domains/schemas.ts` tiene los esquemas base (`Id`, `ById`,
+`Empty`, `Ok`). Reglas, verificadas por `tests/architecture.test.ts`:
 
 - Un orquestador usa servicios propios y de otros dominios.
 - Los servicios se consumen entre dominios; los orquestadores no. Solo `server/`
   importa orquestadores.
-- `lib/` no conoce ningún dominio.
+- `lib/` no conoce ningún dominio y no define modelos: no toca Drizzle. Ni siquiera el
+  actor vive ahí; `lib/` solo sabe `{ userId, role }` para autorizar.
+- Un `models.ts` solo importa otros `models.ts` (para las foreign keys).
 - Un `schemas.ts` solo importa otros `schemas.ts`.
 
 ### Errores
@@ -136,10 +142,10 @@ PostgreSQL + Drizzle. Cada endpoint y su evento se confirman en la misma transac
 
 **No hay historial de eventos.** Un evento sale por dos lados y no se guarda en ninguno:
 
-- **Webhooks.** Por cada suscriptor se encola una entrega con el payload en
-  `deliveries`: outbox durable, firma HMAC y reintentos. Entregada se borra; después de
-  diez fallos queda como `failed`. Quien necesite guardar eventos suscribe un webhook a
-  otro servicio.
+- **Webhooks.** Después del commit se entrega a cada suscriptor, en memoria: firma
+  HMAC y hasta diez intentos con espera exponencial. No hay outbox persistido, así que un
+  reinicio pierde lo pendiente; si eso llega a importar, se vuelve a una tabla de
+  entregas. Quien necesite guardar eventos suscribe un webhook a otro servicio.
 - **Navegadores.** Si el evento declara `refreshesBoard`, un `pg_notify` avisa por SSE
   y el cliente recarga. No hay cursor: al conectar o reconectar llega `ready` y el
   cliente recarga todo. Las lecturas emiten evento pero no refrescan el tablero, así no
@@ -165,8 +171,10 @@ sesiones de navegador. El estado Yjs y su representación Markdown se confirman 
 - `src/backend/lib/`: el wrapper (`endpoint.ts`, `catalog.ts`), los puertos y los kinds
   de error. Sin dominio.
 - `src/backend/domains/`: un directorio por dominio y `kernel.ts`.
-- `src/backend/adapters/postgres/`: esquema Drizzle, migraciones, transacciones y el
-  worker del outbox de webhooks. Es lo único que conoce la tabla `records` y su JSONB.
+- `src/backend/adapters/postgres/`: la transacción: el lock que ordena las escrituras,
+  `afterCommit`, `pg_notify` y la cuenta de BetterAuth ligada a la misma transacción.
+- `src/backend/adapters/webhooks/`: la entrega firmada de eventos, con reintentos.
+- `drizzle/`: las migraciones, generadas desde los `models.ts`.
 - `src/backend/adapters/http/`: Hono. Una ruta por endpoint, extracción de la credencial,
   SSE y el login de BetterAuth.
 - `src/backend/adapters/cli/`: cliente HTTP; saca las rutas de `catalog.read`.
@@ -274,11 +282,21 @@ AGENTS.md vista desde el frontend.
 
 ## Detalles de persistencia
 
-El adaptador almacena entidades tipadas en registros JSONB identificados por colección
-e ID; Drizzle define la tabla y las migraciones, incluidas las tablas de BetterAuth.
-Las propiedades configurables no requieren una migración SQL por campo. El núcleo
-valida tipos y referencias antes de escribir. Para un único tablero, una exclusión
-transaccional de PostgreSQL ordena las escrituras. Si el volumen o concurrencia crece,
+Tablas reales, con foreign keys y migraciones: una por concepto (`cards`,
+`card_assignees`, `board_states`, `fields`, `field_options`, `profiles`, `api_keys`…),
+cada una en el `models.ts` de su dominio. Las de BetterAuth viven en `auth/models.ts`.
+La integridad la da la base: borrar una etapa deja sus tarjetas sin estado y borrar un
+perfil limpia sus asignaciones.
+
+**Sin columnas json, con una excepción:** `cards.properties`, los valores de las
+propiedades que define cada tablero. Su forma cambia por tablero —el roadmap trae
+tableros de varios tipos—, así que una columna fija no calza y una tabla por tipo de
+valor obliga a joins en cada lectura. Las definiciones (`fields`, `field_options`) sí son
+tablas, y el servicio valida el json contra ellas antes de escribir. Lo que tiene
+significado relacional no va ahí: la etapa es `cards.state_id` y los responsables son
+`card_assignees`.
+
+Para un único tablero, una exclusión transaccional de PostgreSQL ordena las escrituras. Si el volumen o concurrencia crece,
 medir ese límite antes de dividir bloqueos o normalizar consultas.
 
 Invitación, cuenta y perfil se crean en una misma transacción usando BetterAuth con el

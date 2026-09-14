@@ -1,16 +1,4 @@
-import type { ActionEvent, Actor } from "./endpoint";
-
-export interface Entity {
-  id: string;
-}
-
-/** Lectura y escritura por colección. Qué tabla hay detrás lo decide el adaptador. */
-export interface Store<E extends { [K in keyof E]: Entity }> {
-  get<K extends keyof E & string>(collection: K, id: string): Promise<E[K] | null>;
-  list<K extends keyof E & string>(collection: K): Promise<E[K][]>;
-  put<K extends keyof E & string>(collection: K, entity: E[K]): Promise<void>;
-  remove(collection: keyof E & string, id: string): Promise<void>;
-}
+import type { ActionEvent } from "./endpoint";
 
 /** Implementations commit the operation and its event together, or roll both back. */
 export interface UnitOfWork<Tx> {
@@ -23,7 +11,7 @@ export type Credential =
   | { kind: "session"; cookie: string };
 
 /** Lo implementa el dominio auth. La autorización del runner se apoya en esto. */
-export interface Authenticator {
+export interface Authenticator<Actor> {
   resolve(credential: Credential | null): Promise<Actor | null>;
 }
 

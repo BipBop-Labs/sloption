@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  ASSIGNEES,
   EMPTY,
   activeFilter,
   filterableFields,
@@ -9,94 +10,98 @@ import type { Card, Field } from "../src/backend/domains/kernel";
 
 const fields: Field[] = [
   {
-    id: "status",
-    name: "Estado",
+    id: "priority",
+    name: "Prioridad",
     type: "select",
     options: [
-      { id: "qa", label: "QA" },
-      { id: "listo", label: "Listo" },
+      { id: "alta", label: "alta" },
+      { id: "baja", label: "baja" },
     ],
   },
-  { id: "assignees", name: "Encargado(s)", type: "people", options: [] },
+  {
+    id: "tags",
+    name: "Etiquetas",
+    type: "multiSelect",
+    options: [
+      { id: "swe", label: "SWE" },
+      { id: "ux", label: "UX" },
+    ],
+  },
 ];
 
-function card(values: Card["values"], title = "Revisar la weekly"): Card {
-  return {
-    id: "c",
-    title,
-    markdown: "",
-    document: null,
-    values,
-    weekly: false,
-    archived: false,
-    archivedStage: null,
-    rank: 1024,
-    version: 1,
-    createdAt: "",
-    updatedAt: "",
-    sourceId: null,
-    bodyMissing: false,
-  };
+function card(
+  properties: Card["properties"] = {},
+  assignees: string[] = [],
+  title = "Revisar la weekly",
+) {
+  return { title, assignees, properties };
 }
-const matches = (c: Card, search: Record<string, unknown>) =>
-  matchesFilters(c, fields, search);
+const matches = (
+  c: ReturnType<typeof card>,
+  search: Record<string, unknown>,
+) => matchesFilters(c, fields, search);
 
 describe("filtros del tablero", () => {
   test("sin filtros pasa todo", () => {
-    expect(matches(card({}), {})).toBe(true);
+    expect(matches(card(), {})).toBe(true);
   });
 
   test("varios valores del mismo campo son un O", () => {
-    expect(matches(card({ status: "qa" }), { status: "qa,listo" })).toBe(true);
-    expect(matches(card({ status: "otro" }), { status: "qa,listo" })).toBe(
+    expect(matches(card({ priority: "alta" }), { priority: "alta,baja" })).toBe(
+      true,
+    );
+    expect(matches(card({ priority: "otra" }), { priority: "alta,baja" })).toBe(
       false,
     );
   });
 
   test("campos distintos son un Y", () => {
-    const c = card({ status: "qa", assignees: ["ana"] });
-    expect(matches(c, { status: "qa", assignees: "ana" })).toBe(true);
-    expect(matches(c, { status: "qa", assignees: "beto" })).toBe(false);
+    const c = card({ priority: "alta" }, ["ana"]);
+    expect(matches(c, { priority: "alta", [ASSIGNEES]: "ana" })).toBe(true);
+    expect(matches(c, { priority: "alta", [ASSIGNEES]: "beto" })).toBe(false);
   });
 
   test("multiSelect coincide si tiene alguno de los pedidos", () => {
-    const c = card({ assignees: ["ana", "beto"] });
-    expect(matches(c, { assignees: "beto" })).toBe(true);
-    expect(matches(c, { assignees: "carla" })).toBe(false);
+    const c = card({ tags: ["swe", "ux"] });
+    expect(matches(c, { tags: "ux" })).toBe(true);
+    expect(matches(c, { tags: "otra" })).toBe(false);
+  });
+
+  test("personas: basta con una de las pedidas", () => {
+    const c = card({}, ["ana", "beto"]);
+    expect(matches(c, { [ASSIGNEES]: "beto,carla" })).toBe(true);
+    expect(matches(c, { [ASSIGNEES]: "carla" })).toBe(false);
   });
 
   test("el valor vacío encuentra las que no tienen ese campo", () => {
-    expect(matches(card({}), { status: EMPTY })).toBe(true);
-    expect(matches(card({ status: null }), { status: EMPTY })).toBe(true);
-    expect(matches(card({ assignees: [] }), { assignees: EMPTY })).toBe(true);
-    expect(matches(card({ status: "qa" }), { status: EMPTY })).toBe(false);
+    expect(matches(card(), { priority: EMPTY })).toBe(true);
+    expect(matches(card({ priority: null }), { priority: EMPTY })).toBe(true);
+    expect(matches(card(), { [ASSIGNEES]: EMPTY })).toBe(true);
+    expect(matches(card({ priority: "alta" }), { priority: EMPTY })).toBe(
+      false,
+    );
   });
 
   test("la búsqueda por título no distingue mayúsculas y es parcial", () => {
-    expect(matches(card({}), { q: "WEEKLY" })).toBe(true);
-    expect(matches(card({}), { q: "  weekly " })).toBe(true);
-    expect(matches(card({}), { q: "daily" })).toBe(false);
+    expect(matches(card(), { q: "WEEKLY" })).toBe(true);
+    expect(matches(card(), { q: "  weekly " })).toBe(true);
+    expect(matches(card(), { q: "daily" })).toBe(false);
   });
 
-  test("el campo de agrupación no se filtra: eso lo muestran las columnas", () => {
+  test("solo se filtra por propiedades con opciones", () => {
     const all: Field[] = [
       ...fields,
       { id: "notas", name: "Notas", type: "text", options: [] },
     ];
-    expect(filterableFields(all, "status").map((f) => f.id)).toEqual([
-      "assignees",
+    expect(filterableFields(all).map((f) => f.id)).toEqual([
+      "priority",
+      "tags",
     ]);
-    // Un parámetro viejo del campo agrupador queda inerte, no filtra a ciegas.
-    expect(
-      matchesFilters(card({ status: "qa" }), filterableFields(all, "status"), {
-        status: "listo",
-      }),
-    ).toBe(true);
   });
 
   test("un filtro vacío en la URL no filtra nada", () => {
-    expect(activeFilter({ status: "" }, "status")).toEqual([]);
-    expect(activeFilter({}, "status")).toEqual([]);
-    expect(matches(card({ status: "qa" }), { status: "" })).toBe(true);
+    expect(activeFilter({ priority: "" }, "priority")).toEqual([]);
+    expect(activeFilter({}, "priority")).toEqual([]);
+    expect(matches(card({ priority: "alta" }), { priority: "" })).toBe(true);
   });
 });

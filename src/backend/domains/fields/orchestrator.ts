@@ -7,7 +7,8 @@ import * as fields from "./services";
 
 export const fieldsOrchestrator = implement(fieldsRouter, {
   async create(input, { tx, deps }) {
-    const field = await fields.create(tx, deps, input);
+    const board = await boards.requireBoard(tx);
+    const field = await fields.create(tx, deps, board.id, input);
     return {
       output: field,
       event: FieldCreated({
@@ -17,8 +18,8 @@ export const fieldsOrchestrator = implement(fieldsRouter, {
       }),
     };
   },
-  async update(input, { tx, deps, resource: field }) {
-    await fields.update(tx, field, {
+  async update(input, { tx, deps, resource }) {
+    const field = await fields.update(tx, resource, {
       name: input.name,
       options: input.options,
     });
@@ -32,11 +33,9 @@ export const fieldsOrchestrator = implement(fieldsRouter, {
       }),
     };
   },
-  async remove(input, { tx, deps, fail }) {
-    const board = await boards.requireMain(tx);
-    if (board.groupingId === input.id) fail("GROUPING_FIELD");
+  async remove(input, { tx, deps }) {
     await fields.remove(tx, input.id);
-    await cards.removeValue(tx, deps, input.id);
+    await cards.removeProperty(tx, deps, input.id);
     return {
       output: { ok: true } as const,
       event: FieldRemoved({ fieldId: input.id }),

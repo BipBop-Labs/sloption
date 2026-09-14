@@ -1,34 +1,57 @@
+import { and, asc, eq, inArray, max, notInArray } from "drizzle-orm";
 import { z } from "zod";
 import { raise } from "../../lib/errors";
-import * as auth from "../auth/services";
 import type { Deps, Tx } from "../kernel";
 import { fieldErrors, valueErrors } from "./errors";
-import type { Field, Value } from "./schemas";
+import { fieldOptions, fields } from "./models";
+import type { Field, FieldOption, Value } from "./schemas";
 
-export const byId = (tx: Tx, fieldId: string) => tx.get("fields", fieldId);
+type FieldRow = typeof fields.$inferSelect;
 
-export async function requireField(tx: Tx, fieldId: string) {
-  return (await byId(tx, fieldId)) ?? raise(fieldErrors, "FIELD_NOT_FOUND");
+async function withOptions(tx: Tx, rows: FieldRow[]): Promise<Field[]> {
+  if (!rows.length) return [];
+  const options = await tx.sql
+    .select()
+    .from(fieldOptions)
+    .where(
+      inArray(
+        fieldOptions.fieldId,
+        rows.map((row) => row.id),
+      ),
+    )
+    .orderBy(asc(fieldOptions.position));
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    options: options
+      .filter((option) => option.fieldId === row.id)
+      .map(({ id, label }) => ({ id, label })),
+  }));
 }
 
-export const hasOptions = (field: Field) =>
+/** Las propiedades del tablero, en su orden. */
+export async function list(tx: Tx, boardId: string) {
+  const rows = await tx.sql
+    .select()
+    .from(fields)
+    .where(eq(fields.boardId, boardId))
+    .orderBy(asc(fields.position));
+  return withOptions(tx, rows);
+}
+
+export async function byId(tx: Tx, fieldId: string): Promise<Field | null> {
+  const rows = await tx.sql.select().from(fields).where(eq(fields.id, fieldId));
+  return (await withOptions(tx, rows))[0] ?? null;
+}
+
+export const hasOptions = (field: Pick<Field, "type">) =>
   field.type === "select" || field.type === "multiSelect";
 
-/** Prioridad, responsables y estado primero; el resto como estén. */
-export async function ordered(tx: Tx) {
-  const primary = ["priority", "assignees", "status"];
-  const rank = (field: Field) =>
-    primary.includes(field.id) ? primary.indexOf(field.id) : 3;
-  return (await tx.list("fields")).sort((a, b) => rank(a) - rank(b));
-}
-
-/** Toda propiedad admite null. Selecciones y personas deben apuntar a ids que existen. */
-export function parseValue(
-  field: Field,
-  value: unknown,
-  assignableIds: ReadonlySet<string>,
-): Value {
+/** Toda propiedad admite null. Una selección tiene que apuntar a opciones que existen. */
+export function parseValue(field: Field, value: unknown): Value {
   if (value === null) return null;
+  const optionIds = new Set(field.options.map((option) => option.id));
   switch (field.type) {
     case "text":
       return z.string().max(100_000).parse(value);
@@ -36,73 +59,104 @@ export function parseValue(
       return z.number().finite().parse(value);
     case "date":
       return z.iso.date().parse(value);
-    case "select": {
-      const optionIds = new Set(field.options.map((option) => option.id));
+    case "select":
       return z
         .string()
         .refine((id) => optionIds.has(id), "Unknown option")
         .parse(value);
-    }
     case "multiSelect":
-    case "people": {
-      const validIds =
-        field.type === "people"
-          ? assignableIds
-          : new Set(field.options.map((option) => option.id));
       return z
-        .array(z.string().refine((id) => validIds.has(id), "Unknown reference"))
+        .array(z.string().refine((id) => optionIds.has(id), "Unknown option"))
         .refine(
           (ids) => new Set(ids).size === ids.length,
-          "Duplicate reference",
+          "Duplicate option",
         )
         .parse(value);
-    }
   }
 }
 
-/** Toda escritura de valores pasa por acá: tipos y referencias antes de guardar. */
-export async function validateValues(
+/** Toda escritura de propiedades pasa por acá: tipos y opciones antes de guardar. */
+export async function validateProperties(
   tx: Tx,
+  boardId: string,
   proposed: Record<string, unknown>,
 ) {
-  const fields = new Map(
-    (await tx.list("fields")).map((field) => [field.id, field]),
-  );
-  const profileIds = await auth.profileIds(tx);
+  if (!Object.keys(proposed).length) return;
+  const known = new Map((await list(tx, boardId)).map((field) => [field.id, field]));
   for (const [fieldId, value] of Object.entries(proposed)) {
-    const field = fields.get(fieldId);
+    const field = known.get(fieldId);
     if (!field) return raise(valueErrors, "UNKNOWN_PROPERTY");
     try {
-      parseValue(field, value, profileIds);
+      parseValue(field, value);
     } catch {
       raise(valueErrors, "INVALID_VALUE", `Invalid value for ${field.name}`);
     }
   }
 }
 
-function assertUniqueOptions(options: Field["options"]) {
+function assertOptions(type: Field["type"], options: FieldOption[]) {
   if (new Set(options.map((option) => option.id)).size !== options.length)
     raise(fieldErrors, "DUPLICATE_OPTION");
+  if (!hasOptions({ type }) && options.length) raise(fieldErrors, "NO_OPTIONS");
 }
 
-export async function create(tx: Tx, deps: Deps, input: Omit<Field, "id">) {
-  assertUniqueOptions(input.options);
+/** Deja las opciones en este orden: las que faltan se borran. */
+async function writeOptions(tx: Tx, fieldId: string, options: FieldOption[]) {
+  const ids = options.map((option) => option.id);
+  await tx.sql
+    .delete(fieldOptions)
+    .where(
+      ids.length
+        ? and(eq(fieldOptions.fieldId, fieldId), notInArray(fieldOptions.id, ids))
+        : eq(fieldOptions.fieldId, fieldId),
+    );
+  for (const [position, option] of options.entries())
+    await tx.sql
+      .insert(fieldOptions)
+      .values({ ...option, fieldId, position })
+      .onConflictDoUpdate({
+        target: [fieldOptions.fieldId, fieldOptions.id],
+        set: { label: option.label, position },
+      });
+}
+
+export async function create(
+  tx: Tx,
+  deps: Deps,
+  boardId: string,
+  input: Omit<Field, "id">,
+): Promise<Field> {
+  assertOptions(input.type, input.options);
+  const [last] = await tx.sql
+    .select({ position: max(fields.position) })
+    .from(fields)
+    .where(eq(fields.boardId, boardId));
   const field = { id: deps.newId(), ...input };
-  await tx.put("fields", field);
+  await tx.sql.insert(fields).values({
+    id: field.id,
+    boardId,
+    name: field.name,
+    type: field.type,
+    position: (last?.position ?? -1) + 1,
+  });
+  await writeOptions(tx, field.id, field.options);
   return field;
 }
 
 export async function update(
   tx: Tx,
   field: Field,
-  changes: { name: string; options: Field["options"] },
-) {
-  assertUniqueOptions(changes.options);
-  if (!hasOptions(field) && changes.options.length)
-    raise(fieldErrors, "NO_OPTIONS");
-  Object.assign(field, changes);
-  await tx.put("fields", field);
-  return field;
+  changes: { name: string; options: FieldOption[] },
+): Promise<Field> {
+  assertOptions(field.type, changes.options);
+  await tx.sql
+    .update(fields)
+    .set({ name: changes.name })
+    .where(eq(fields.id, field.id));
+  await writeOptions(tx, field.id, changes.options);
+  return { ...field, ...changes };
 }
 
-export const remove = (tx: Tx, fieldId: string) => tx.remove("fields", fieldId);
+export async function remove(tx: Tx, fieldId: string) {
+  await tx.sql.delete(fields).where(eq(fields.id, fieldId));
+}

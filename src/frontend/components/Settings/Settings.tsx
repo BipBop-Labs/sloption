@@ -1,7 +1,7 @@
 import "./Settings.css";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Actor } from "@/backend/lib/endpoint";
+import type { Actor } from "@/backend/domains/kernel";
 import { action, errorMessage, refresh, type BoardData } from "@/frontend/lib/api";
 import {
   Button,

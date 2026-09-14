@@ -1,6 +1,6 @@
 import "./Board.css";
 import React, { useRef, useState } from "react";
-import type { Card } from "@/backend/domains/kernel";
+import type { BoardState, Card } from "@/backend/domains/kernel";
 import {
   action,
   errorMessage,
@@ -36,30 +36,27 @@ export function Board({
 }) {
   const confirm = useConfirm();
   const [newStage, setNewStage] = useState("");
-  /** Las columnas son las opciones del campo de agrupación: agregar y quitar
-   *  una etapa es una sola acción, field.update, que además limpia el valor en
-   *  las tarjetas que la usaban. */
-  async function saveStages(
-    options: { id: string; label: string }[],
-  ): Promise<void> {
-    if (!grouping) return;
-    // Predicción del resultado: el tablero ya se dibuja con el orden nuevo.
+  /** Las columnas son las etapas del tablero: agregar, reordenar y quitar una
+   *  es una sola acción, boards.setStates. Una etapa quitada deja sus tarjetas
+   *  sin estado. */
+  async function saveStages(states: BoardState[]): Promise<void> {
+    const kept = new Set(states.map((state) => state.id));
+    // Predicción del resultado: el tablero ya se dibuja con las etapas nuevas.
     queryClient.setQueriesData<BoardData>(
       { queryKey: ["board"] },
       (cache) =>
         cache && {
           ...cache,
-          fields: cache.fields.map((field) =>
-            field.id === grouping.id ? { ...field, options } : field,
+          states,
+          cards: cache.cards.map((card) =>
+            card.stateId && !kept.has(card.stateId)
+              ? { ...card, stateId: null }
+              : card,
           ),
         },
     );
     try {
-      await action("fields.update", {
-        id: grouping.id,
-        name: grouping.name,
-        options,
-      });
+      await action("boards.setStates", { states });
       refresh();
     } catch (error) {
       refresh();
@@ -67,8 +64,7 @@ export function Board({
     }
   }
   function moveStage(id: string, beforeId: string): void {
-    if (grouping)
-      void saveStages(reorderStages(grouping.options, id, beforeId));
+    void saveStages(reorderStages(data.states, id, beforeId));
   }
   // setDrop tiene identidad estable, así que CardTile sigue memoizado.
   const [drop, setDrop] = useState<(DropTarget & { height: number }) | null>(
@@ -168,26 +164,20 @@ export function Board({
     clearTimeout(state.timer);
     dropColumn(state);
   }
-  const grouping = data.fields.find(
-    (field) => field.id === data.board.groupingId,
-  );
-  const options = [
-    ...(grouping?.options ?? []),
-    { id: "", label: "Sin estado" },
-  ];
+  const columns = [...data.states, { id: "", label: "Sin estado" }];
   return (
     <div id="board-content" className="board" aria-label="Tablero kanban">
-      {options.map((option) => {
+      {columns.map((option) => {
         const cards = data.cards.filter(
-          (card) => (card.values[data.board.groupingId] ?? "") === option.id,
+          (card) => (card.stateId ?? "") === option.id,
         );
         // "" = al final de la columna; un id = justo antes de esa tarjeta.
         const slot =
           drop && (drop.optionId ?? "") === option.id
             ? (drop.beforeId ?? "")
             : null;
-        const stages = grouping?.options ?? [];
-        const reorderable = isAdmin && !!grouping && !!option.id;
+        const stages = data.states;
+        const reorderable = isAdmin && !!option.id;
         return (
           <React.Fragment key={option.id}>
             {columnDrop?.beforeId === option.id && (
@@ -274,9 +264,7 @@ export function Board({
                         })
                       )
                         void saveStages(
-                          (grouping?.options ?? []).filter(
-                            (item) => item.id !== option.id,
-                          ),
+                          data.states.filter((item) => item.id !== option.id),
                         );
                     }}
                   >
@@ -307,7 +295,7 @@ export function Board({
                   try {
                     const created = await action<Card>("cards.create", {
                       title,
-                      values: { [data.board.groupingId]: option.id || null },
+                      stateId: option.id || null,
                       weekly: true,
                     });
                     refresh();
@@ -323,7 +311,7 @@ export function Board({
           </React.Fragment>
         );
       })}
-      {isAdmin && grouping && (
+      {isAdmin && (
         <form
           className="column add-stage"
           onSubmit={(event) => {
@@ -332,7 +320,7 @@ export function Board({
             if (!label) return;
             setNewStage("");
             void saveStages([
-              ...(grouping.options ?? []),
+              ...data.states,
               { id: crypto.randomUUID(), label },
             ]);
           }}

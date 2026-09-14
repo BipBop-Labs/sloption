@@ -3,18 +3,19 @@ import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { betterAuth } from "better-auth";
-import * as schema from "../adapters/postgres/schema";
 import { createStore } from "../adapters/postgres/store";
 import { documents } from "../adapters/documents/yjs";
+import { deliver } from "../adapters/webhooks/deliver";
 import { authConfiguration } from "./auth-options";
 import { createCatalog } from "../lib/catalog";
-import type { Actor } from "../lib/endpoint";
 import type { Publish } from "../lib/ports";
 import type { Deps, Tx } from "../domains/kernel";
 import { assetsOrchestrator } from "../domains/assets/orchestrator";
 import { createAuthenticator } from "../domains/auth/authenticator";
 import { sessionEvents } from "../domains/auth/events";
+import * as authModels from "../domains/auth/models";
 import { authOrchestrators } from "../domains/auth/orchestrator";
+import type { Actor } from "../domains/auth/schemas";
 import { sessionEvent } from "../domains/auth/services";
 import { boardsOrchestrator } from "../domains/boards/orchestrator";
 import { cardsOrchestrator } from "../domains/cards/orchestrator";
@@ -39,7 +40,10 @@ const secrets = {
 };
 export const auth = betterAuth({
   ...authConfiguration,
-  database: drizzleAdapter(drizzle(pool), { provider: "pg", schema }),
+  database: drizzleAdapter(drizzle(pool), {
+    provider: "pg",
+    schema: authModels,
+  }),
 });
 const deps: Deps = {
   newId: randomUUID,
@@ -48,10 +52,13 @@ const deps: Deps = {
   documents,
 };
 
-/** Un evento sale a los webhooks suscritos y, si cambia el tablero, a los navegadores. */
+/**
+ * Un evento sale a los webhooks suscritos, después del commit, y a los
+ * navegadores si cambia el tablero. No se guarda en ningún lado.
+ */
 const publish: Publish<Tx> = async (tx, event, { refreshesBoard }) => {
-  for (const hook of subscribers(event, await tx.list("webhooks")))
-    await tx.enqueueDelivery(hook.id, event);
+  const hooks = await subscribers(tx, event.type);
+  if (hooks.length) tx.afterCommit(() => deliver(hooks, event));
   if (refreshesBoard) await tx.notify(event.type);
 };
 

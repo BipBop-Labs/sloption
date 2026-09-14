@@ -1,5 +1,6 @@
 import type { Authenticator, Secrets, UnitOfWork } from "../../lib/ports";
 import type { Tx } from "../kernel";
+import type { Actor } from "./schemas";
 import { fromApiKey, fromSession } from "./services";
 
 /**
@@ -12,7 +13,7 @@ export function createAuthenticator(deps: {
   secrets: Pick<Secrets, "digest">;
   /** El usuario de BetterAuth detrás de la cookie, o null. */
   sessionUserId(cookie: string): Promise<string | null>;
-}): Authenticator {
+}): Authenticator<Actor> {
   return {
     async resolve(credential) {
       if (!credential) return null;

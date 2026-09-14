@@ -1,8 +1,8 @@
+import { z } from "zod";
 import { defineEndpoint, defineRouter } from "../../lib/endpoint";
-import { fieldErrors } from "../fields/errors";
 import { boardErrors } from "./errors";
-import { BoardGrouped, BoardViewed } from "./events";
-import { Board, BoardQuery, BoardView, Grouping } from "./schemas";
+import { BoardStatesChanged, BoardViewed } from "./events";
+import { BoardQuery, BoardState, BoardView, StatesChange } from "./schemas";
 
 export const boardsRouter = defineRouter({
   name: "boards",
@@ -10,19 +10,19 @@ export const boardsRouter = defineRouter({
   cli: "boards",
   endpoints: {
     read: defineEndpoint({
-      doc: "El tablero con sus propiedades, personas y tarjetas sin cuerpo. view: week (esta semana), all o archived.",
+      doc: "El tablero con sus etapas, propiedades, personas y tarjetas sin cuerpo. view: week (esta semana), all o archived.",
       access: "member",
       input: BoardQuery,
       output: BoardView,
       event: BoardViewed,
     }),
-    configure: defineEndpoint({
-      doc: "Elige la propiedad de selección simple que define las columnas.",
+    setStates: defineEndpoint({
+      doc: "Deja las etapas del tablero en este orden: agrega, renombra, reordena y borra. Las tarjetas de una etapa borrada quedan sin estado.",
       access: "admin",
-      input: Grouping,
-      output: Board,
-      event: BoardGrouped,
-      errors: { ...boardErrors, ...fieldErrors },
+      input: StatesChange,
+      output: z.array(BoardState),
+      event: BoardStatesChanged,
+      errors: boardErrors,
     }),
   },
 });

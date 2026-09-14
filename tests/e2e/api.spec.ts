@@ -99,10 +99,10 @@ test("invitation, member authorization, CLI parity and revocation", async ({
     await call("cards.update", {
       id: card.id,
       version: card.version,
-      values: { [field.id]: "a" },
+      properties: { [field.id]: "a" },
     })
   ).json();
-  expect(edited.values[field.id]).toBe("a");
+  expect(edited.properties[field.id]).toBe("a");
   const stale = await call("cards.update", {
     id: card.id,
     version: card.version,
@@ -120,7 +120,7 @@ test("invitation, member authorization, CLI parity and revocation", async ({
     ).ok(),
   ).toBeTruthy();
   const cleared = await (await call("cards.read", { id: card.id })).json();
-  expect(cleared.values[field.id]).toBeNull();
+  expect(cleared.properties[field.id]).toBeNull();
   await call("fields.remove", { id: field.id });
   await call("cards.archive", { id: card.id, archived: true });
   expect(

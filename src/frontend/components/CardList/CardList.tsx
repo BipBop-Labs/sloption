@@ -1,5 +1,10 @@
 import "./CardList.css";
-import type { Card, Field, Profile } from "@/backend/domains/kernel";
+import type {
+  BoardState,
+  Card,
+  Field,
+  Profile,
+} from "@/backend/domains/kernel";
 import { cardQuery, queryClient } from "@/frontend/lib/api";
 import { Avatars, Chip, chipColor, Composer } from "@/frontend/ui";
 
@@ -16,18 +21,17 @@ export type CardGroup = {
  *  acá solo se dibuja. Sin arrastre: para mover entre etapas está el kanban. */
 export function CardList({
   groups,
+  states,
   fields,
   profiles,
-  groupingId,
   open,
 }: {
   groups: CardGroup[];
+  states: BoardState[];
   fields: Field[];
   profiles: Profile[];
-  groupingId: string;
   open(id: string): void;
 }) {
-  const stages = fields.find((field) => field.id === groupingId);
   const priority = fields.find((field) => field.id === "priority");
   return (
     <div id="board-content" className="list" aria-label="Lista de tareas">
@@ -38,12 +42,12 @@ export function CardList({
             <span>{group.cards.length}</span>
           </summary>
           {group.cards.map((card) => {
-            // La archivada ya no pertenece a una columna: muestra la etiqueta
+            // La archivada ya no pertenece a una etapa: muestra la etiqueta
             // que guardó al archivarse.
             const stage = card.archived
-              ? (card.archivedStage ?? "")
-              : String(card.values[groupingId] ?? "");
-            const assignees = card.values.assignees;
+              ? card.archivedStage
+              : states.find((state) => state.id === card.stateId)?.label;
+            const priorityValue = card.properties.priority;
             return (
               <button
                 type="button"
@@ -61,22 +65,16 @@ export function CardList({
                   {card.title}
                 </span>
                 {stage && (
-                  <Chip color={chipColor(stage)}>
-                    {stages?.options.find((option) => option.id === stage)
-                      ?.label ?? stage}
-                  </Chip>
+                  <Chip color={chipColor(card.stateId ?? stage)}>{stage}</Chip>
                 )}
-                {typeof card.values.priority === "string" && (
-                  <Chip color={chipColor(card.values.priority)}>
+                {typeof priorityValue === "string" && (
+                  <Chip color={chipColor(priorityValue)}>
                     {priority?.options.find(
-                      (option) => option.id === card.values.priority,
-                    )?.label ?? card.values.priority}
+                      (option) => option.id === priorityValue,
+                    )?.label ?? priorityValue}
                   </Chip>
                 )}
-                <Avatars
-                  ids={Array.isArray(assignees) ? assignees : []}
-                  people={profiles}
-                />
+                <Avatars ids={card.assignees} people={profiles} />
               </button>
             );
           })}

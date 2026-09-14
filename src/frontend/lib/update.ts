@@ -32,38 +32,34 @@ export function useUpdate(showError: (message: string) => void): Update {
         queryKey: ["board"],
       });
       const previousCard = queryClient.getQueryData<Card>(["card", input.id]);
-      if (name === "cards.update") {
-        const current =
-          previousCard ??
-          caches
-            .flatMap(([, data]) => data?.cards ?? [])
-            .find((card) => card.id === input.id);
-        if (current)
-          optimistic = {
-            ...(typeof input.title === "string" ? { title: input.title } : {}),
-            values: {
-              ...current.values,
-              ...(input.values as Record<string, Value> | undefined),
-            },
-          };
-      }
+      const current =
+        previousCard ??
+        caches
+          .flatMap(([, data]) => data?.cards ?? [])
+          .find((card) => card.id === input.id);
+      if (name === "cards.update" && current)
+        optimistic = {
+          ...(typeof input.title === "string" ? { title: input.title } : {}),
+          properties: {
+            ...current.properties,
+            ...(input.properties as Record<string, Value> | undefined),
+          },
+        };
+      if (name === "cards.assign")
+        optimistic = { assignees: input.assignees as string[] };
       if (name === "cards.move") {
         const data = caches.find(([, data]) =>
           data?.cards.some((card) => card.id === input.id),
         )?.[1];
-        const current = data?.cards.find((card) => card.id === input.id);
-        if (data && current) {
-          const before = data.cards.find((card) => card.id === input.beforeId);
-          optimistic = {
-            values: {
-              ...current.values,
-              [data.board.groupingId]: input.optionId as Value,
-            },
+        const before = data?.cards.find((card) => card.id === input.beforeId);
+        optimistic = {
+          stateId: (input.stateId as string | null) ?? null,
+          ...(data && {
             rank: before
               ? before.rank - 0.5
               : Math.max(0, ...data.cards.map((card) => card.rank)) + 1024,
-          };
-        }
+          }),
+        };
       }
       if (optimistic) {
         void queryClient.cancelQueries({ queryKey: ["board"] });

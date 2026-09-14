@@ -62,13 +62,16 @@ Mientras esto esté abierto, **no se escribe código de features.**
 
 ### 5. El backend se corta por dominio
 
-Cada dominio de `src/backend/domains/` tiene `schemas.ts` (todos sus esquemas zod),
-`router.ts` (solo definiciones y doc, sin esquemas inline), `events.ts` (los eventos que
-emite), `orchestrator.ts` (una función por endpoint) y `services.ts` (lo reutilizable).
+Cada dominio de `src/backend/domains/` tiene `models.ts` (sus tablas Drizzle),
+`schemas.ts` (todos sus esquemas zod), `router.ts` (solo definiciones y doc, sin
+esquemas inline), `events.ts` (los eventos que emite), `orchestrator.ts` (una función por
+endpoint) y `services.ts` (lo reutilizable, con consultas Drizzle directas).
 
 - Un orquestador usa servicios, propios o de otro dominio. **Nunca otro orquestador.**
 - Los servicios son lo único que se comparte entre dominios.
-- `src/backend/lib/` no importa dominios: los usa por puertos.
+- `src/backend/lib/` no importa dominios ni define modelos: nada de tablas ni de Drizzle.
+- Tablas reales con migraciones, sin columnas json. La única excepción es
+  `cards.properties`: su forma la define cada tablero.
 
 `tests/architecture.test.ts` falla si se rompe alguna. Detalle en [CODE.md](CODE.md).
 
