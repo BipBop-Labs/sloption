@@ -3,7 +3,7 @@ import { raise } from "../../lib/errors";
 import type { Deps, Tx } from "../kernel";
 import { invitationErrors, profileErrors } from "./errors";
 import { SignedIn, SignedOut } from "./events";
-import type { Invitation, Key, Profile, Role } from "./model";
+import type { Invitation, Key, Profile, Role } from "./schemas";
 
 /** Una organización por deploy, por ahora. Ver Roadmap en ESTADO.md. */
 const ORG_ID = "main";

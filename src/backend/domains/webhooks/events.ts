@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineEvent } from "../../lib/endpoint";
-import { id } from "../kernel";
+import { Id } from "../schemas";
 
 export const WebhooksListed = defineEvent("webhooks.listed.v1", {
   data: z.object({}).strict(),
@@ -9,7 +9,7 @@ export const WebhooksListed = defineEvent("webhooks.listed.v1", {
 
 export const WebhookCreated = defineEvent("webhooks.created.v1", {
   data: z
-    .object({ webhookId: id, url: z.string(), events: z.array(id) })
+    .object({ webhookId: Id, url: z.string(), events: z.array(Id) })
     .strict(),
   refreshesBoard: false,
 });
@@ -17,9 +17,9 @@ export const WebhookCreated = defineEvent("webhooks.created.v1", {
 export const WebhookUpdated = defineEvent("webhooks.updated.v1", {
   data: z
     .object({
-      webhookId: id,
+      webhookId: Id,
       url: z.string(),
-      events: z.array(id),
+      events: z.array(Id),
       enabled: z.boolean(),
     })
     .strict(),
@@ -27,6 +27,6 @@ export const WebhookUpdated = defineEvent("webhooks.updated.v1", {
 });
 
 export const WebhookRemoved = defineEvent("webhooks.removed.v1", {
-  data: z.object({ webhookId: id }).strict(),
+  data: z.object({ webhookId: Id }).strict(),
   refreshesBoard: false,
 });

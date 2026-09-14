@@ -5,7 +5,7 @@ Cursor, Codex o quien sea. **Leelo entero antes de escribir código.**
 
 ## Qué es esto
 
-**Sloption**, el back office de Revi. Primer trabajo: reemplazar el kanban de Notion,
+**Sloption**, un back office. Primer trabajo: reemplazar el kanban de Notion,
 incluido el flujo de la weekly.
 
 Cuatro documentos, y cada uno manda sobre lo suyo:
@@ -62,9 +62,9 @@ Mientras esto esté abierto, **no se escribe código de features.**
 
 ### 5. El backend se corta por dominio
 
-Cada dominio de `src/backend/domains/` tiene `router.ts` (solo definiciones y doc),
-`events.ts` (los eventos que emite), `orchestrator.ts` (una función por endpoint) y
-`services.ts` (lo reutilizable).
+Cada dominio de `src/backend/domains/` tiene `schemas.ts` (todos sus esquemas zod),
+`router.ts` (solo definiciones y doc, sin esquemas inline), `events.ts` (los eventos que
+emite), `orchestrator.ts` (una función por endpoint) y `services.ts` (lo reutilizable).
 
 - Un orquestador usa servicios, propios o de otro dominio. **Nunca otro orquestador.**
 - Los servicios son lo único que se comparte entre dominios.
@@ -130,14 +130,13 @@ apariencia similar a shadcn el 2026-09-08: tokens semánticos, claro/oscuro, chi
 selectores dropdown. Las tarjetas abren en un drawer lateral. Cero webfonts.
 La preferencia de tema también es una acción persistida, accesible por API y CLI.
 Mobile-first, UI optimista, drag por transform y transiciones con reduced motion.
-El design system de los otros productos Revi sigue sin heredarse automáticamente.
 
 ## Qué NO construir
 
 - Vistas que no sean kanban (tabla, calendario, timeline).
 - Ciclos / sprints. Descartado explícitamente; la marca de "esta semana" alcanza.
 - Login social, magic links, 2FA.
-- El back office de las otras aplicaciones de Revi. La arquitectura tiene que
+- El back office de otras aplicaciones. La arquitectura tiene que
   admitirlo; la funcionalidad no se construye ahora.
 
 ## Higiene de sesión

@@ -1,15 +1,15 @@
 import { z } from "zod";
 import { defineEvent } from "../../lib/endpoint";
-import { id } from "../kernel";
+import { Id } from "../schemas";
 
 export const CardViewed = defineEvent("cards.viewed.v1", {
-  data: z.object({ cardId: id }).strict(),
+  data: z.object({ cardId: Id }).strict(),
   refreshesBoard: false,
 });
 
 export const CardCreated = defineEvent("cards.created.v1", {
   data: z
-    .object({ cardId: id, title: z.string(), weekly: z.boolean() })
+    .object({ cardId: Id, title: z.string(), weekly: z.boolean() })
     .strict(),
   refreshesBoard: true,
 });
@@ -17,7 +17,7 @@ export const CardCreated = defineEvent("cards.created.v1", {
 export const CardUpdated = defineEvent("cards.updated.v1", {
   data: z
     .object({
-      cardId: id,
+      cardId: Id,
       version: z.number().int(),
       changedFields: z.array(z.string()),
     })
@@ -26,7 +26,7 @@ export const CardUpdated = defineEvent("cards.updated.v1", {
 });
 
 export const CardWeeklyChanged = defineEvent("cards.weeklyChanged.v1", {
-  data: z.object({ cardId: id, weekly: z.boolean() }).strict(),
+  data: z.object({ cardId: Id, weekly: z.boolean() }).strict(),
   refreshesBoard: true,
 });
 
@@ -34,7 +34,7 @@ export const CardWeeklyChanged = defineEvent("cards.weeklyChanged.v1", {
 export const CardArchivedChanged = defineEvent("cards.archivedChanged.v1", {
   data: z
     .object({
-      cardId: id,
+      cardId: Id,
       archived: z.boolean(),
       stage: z.string().nullable(),
     })
@@ -45,16 +45,16 @@ export const CardArchivedChanged = defineEvent("cards.archivedChanged.v1", {
 export const CardMoved = defineEvent("cards.moved.v1", {
   data: z
     .object({
-      cardId: id,
-      fromOptionId: id.nullable(),
-      toOptionId: id.nullable(),
-      beforeId: id.nullable(),
+      cardId: Id,
+      fromOptionId: Id.nullable(),
+      toOptionId: Id.nullable(),
+      beforeId: Id.nullable(),
     })
     .strict(),
   refreshesBoard: true,
 });
 
 export const CardBodyEdited = defineEvent("cards.bodyEdited.v1", {
-  data: z.object({ cardId: id, version: z.number().int() }).strict(),
+  data: z.object({ cardId: Id, version: z.number().int() }).strict(),
   refreshesBoard: true,
 });

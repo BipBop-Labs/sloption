@@ -4,7 +4,7 @@
 
 ## Qué es
 
-**Sloption** es el back office de Revi.
+**Sloption** es un back office.
 
 Su primer trabajo — y el único en alcance ahora — es **reemplazar el tablero kanban
 que hoy vivimos en Notion**, incluido el flujo de la weekly.
@@ -130,7 +130,7 @@ Esto mantiene el modelo chico y hace el tablero configurable sin código.
 - Login social, magic links, 2FA.
 - **Ciclos / sprints.** Se conversó y se descartó: hoy no es parte del flujo de la
   weekly. La marca de "esta semana" alcanza.
-- El back office extensible de las otras aplicaciones de Revi. La arquitectura tiene
+- El back office extensible de otras aplicaciones. La arquitectura tiene
   que admitirlo; la funcionalidad no se construye ahora.
 
 ## Confirmaciones de implementación — 2026-09-08

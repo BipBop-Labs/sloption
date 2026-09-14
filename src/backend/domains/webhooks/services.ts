@@ -2,7 +2,7 @@ import type { ActionEvent } from "../../lib/endpoint";
 import { raise } from "../../lib/errors";
 import type { Deps, Tx } from "../kernel";
 import { webhookErrors } from "./errors";
-import type { Webhook } from "./model";
+import type { NewWebhook, Webhook } from "./schemas";
 
 /** A quién le llega un evento. La suscripción decide, no la emisión. */
 export function subscribers(event: ActionEvent, hooks: readonly Webhook[]) {
@@ -19,12 +19,6 @@ export async function list(tx: Tx) {
   );
 }
 
-interface Subscription {
-  url: string;
-  events: string[];
-  enabled: boolean;
-}
-
 function assertKnown(events: readonly string[], known: readonly string[]) {
   if (events.some((event) => !known.includes(event)))
     raise(webhookErrors, "UNKNOWN_EVENT");
@@ -33,7 +27,7 @@ function assertKnown(events: readonly string[], known: readonly string[]) {
 export async function create(
   tx: Tx,
   deps: Deps,
-  input: Subscription,
+  input: NewWebhook,
   known: readonly string[],
 ) {
   assertKnown(input.events, known);
@@ -49,7 +43,7 @@ export async function create(
 export async function update(
   tx: Tx,
   hook: Webhook,
-  input: Subscription,
+  input: NewWebhook,
   known: readonly string[],
 ) {
   assertKnown(input.events, known);

@@ -1,9 +1,9 @@
+import { z } from "zod";
 import { raise } from "../../lib/errors";
 import * as auth from "../auth/services";
 import type { Deps, Tx } from "../kernel";
 import { fieldErrors, valueErrors } from "./errors";
-import type { Field } from "./model";
-import { parsePropertyValue } from "./properties";
+import type { Field, Value } from "./schemas";
 
 export const byId = (tx: Tx, fieldId: string) => tx.get("fields", fieldId);
 
@@ -22,6 +22,44 @@ export async function ordered(tx: Tx) {
   return (await tx.list("fields")).sort((a, b) => rank(a) - rank(b));
 }
 
+/** Toda propiedad admite null. Selecciones y personas deben apuntar a ids que existen. */
+export function parseValue(
+  field: Field,
+  value: unknown,
+  assignableIds: ReadonlySet<string>,
+): Value {
+  if (value === null) return null;
+  switch (field.type) {
+    case "text":
+      return z.string().max(100_000).parse(value);
+    case "number":
+      return z.number().finite().parse(value);
+    case "date":
+      return z.iso.date().parse(value);
+    case "select": {
+      const optionIds = new Set(field.options.map((option) => option.id));
+      return z
+        .string()
+        .refine((id) => optionIds.has(id), "Unknown option")
+        .parse(value);
+    }
+    case "multiSelect":
+    case "people": {
+      const validIds =
+        field.type === "people"
+          ? assignableIds
+          : new Set(field.options.map((option) => option.id));
+      return z
+        .array(z.string().refine((id) => validIds.has(id), "Unknown reference"))
+        .refine(
+          (ids) => new Set(ids).size === ids.length,
+          "Duplicate reference",
+        )
+        .parse(value);
+    }
+  }
+}
+
 /** Toda escritura de valores pasa por acá: tipos y referencias antes de guardar. */
 export async function validateValues(
   tx: Tx,
@@ -35,7 +73,7 @@ export async function validateValues(
     const field = fields.get(fieldId);
     if (!field) return raise(valueErrors, "UNKNOWN_PROPERTY");
     try {
-      parsePropertyValue(field, value, profileIds);
+      parseValue(field, value, profileIds);
     } catch {
       raise(valueErrors, "INVALID_VALUE", `Invalid value for ${field.name}`);
     }

@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   implement as implementRouter,
   type ActionEvent,
@@ -6,12 +5,12 @@ import {
   type RouterSpec,
 } from "../lib/endpoint";
 import type { Documents, Secrets, Store } from "../lib/ports";
-import type { Asset } from "./assets/model";
-import type { Invitation, Key, Profile } from "./auth/model";
-import type { Board } from "./boards/model";
-import type { Card } from "./cards/model";
-import type { Field } from "./fields/model";
-import type { Webhook } from "./webhooks/model";
+import type { Asset } from "./assets/schemas";
+import type { Invitation, Key, Profile } from "./auth/schemas";
+import type { Board } from "./boards/schemas";
+import type { Card } from "./cards/schemas";
+import type { Field } from "./fields/schemas";
+import type { Webhook } from "./webhooks/schemas";
 
 /** Lo que comparten los dominios: colecciones, transacción y dependencias. */
 export interface Entities {
@@ -48,11 +47,6 @@ export function implement<Rt extends RouterSpec>(
   return implementRouter(router, handlers);
 }
 
-export const id = z.string().min(1).max(200);
-export const empty = z.object({}).strict();
-export const byId = z.object({ id }).strict();
-export const ok = z.object({ ok: z.literal(true) }).strict();
-
 export type { Asset, Board, Card, Field, Invitation, Key, Profile, Webhook };
-export type { Role } from "./auth/model";
-export type { Value } from "./fields/model";
+export type { Role } from "./auth/schemas";
+export type { Value } from "./fields/schemas";

@@ -14,11 +14,8 @@ import {
   type Actor,
 } from "../src/backend/lib/endpoint";
 import { defineErrors } from "../src/backend/lib/errors";
-import {
-  parsePropertyValue,
-  removeOptionReference,
-  type Property,
-} from "../src/backend/domains/fields/properties";
+import type { Field } from "../src/backend/domains/fields/schemas";
+import { parseValue } from "../src/backend/domains/fields/services";
 
 const member: Actor = {
   userId: "owner",
@@ -296,8 +293,8 @@ describe("eventos", () => {
   });
 });
 
-describe("property values", () => {
-  const property: Property = {
+describe("valores de propiedades", () => {
+  const field: Field = {
     id: "category",
     name: "Categoría",
     type: "multiSelect",
@@ -306,32 +303,18 @@ describe("property values", () => {
       { id: "product", label: "Producto" },
     ],
   };
-  it("accepts empty values and rejects dangling selections", () => {
-    expect(parsePropertyValue(property, null, new Set())).toBeNull();
-    expect(parsePropertyValue(property, ["swe"], new Set())).toEqual(["swe"]);
-    expect(() =>
-      parsePropertyValue(property, ["missing"], new Set()),
-    ).toThrow();
-    expect(() =>
-      parsePropertyValue(property, ["swe", "swe"], new Set()),
-    ).toThrow();
+  it("acepta vacío y rechaza selecciones que no existen", () => {
+    expect(parseValue(field, null, new Set())).toBeNull();
+    expect(parseValue(field, ["swe"], new Set())).toEqual(["swe"]);
+    expect(() => parseValue(field, ["missing"], new Set())).toThrow();
+    expect(() => parseValue(field, ["swe", "swe"], new Set())).toThrow();
   });
-  it("clears only the removed option", () => {
-    expect(removeOptionReference(["swe", "product"], "swe")).toEqual([
-      "product",
-    ]);
-    expect(removeOptionReference("swe", "swe")).toBeNull();
-  });
-  it("validates calendar dates and finite numbers", () => {
+  it("valida fechas de calendario y números finitos", () => {
     expect(() =>
-      parsePropertyValue(
-        { ...property, type: "date" },
-        "2026-02-30",
-        new Set(),
-      ),
+      parseValue({ ...field, type: "date" }, "2026-02-30", new Set()),
     ).toThrow();
     expect(() =>
-      parsePropertyValue({ ...property, type: "number" }, Infinity, new Set()),
+      parseValue({ ...field, type: "number" }, Infinity, new Set()),
     ).toThrow();
   });
 });

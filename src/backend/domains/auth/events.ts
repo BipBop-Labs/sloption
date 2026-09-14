@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defineEvent } from "../../lib/endpoint";
-import { id } from "../kernel";
-import { roleSchema, themeSchema } from "./model";
+import { Id } from "../schemas";
+import { Role, Theme } from "./schemas";
 
 const session = z
   .object({ ip: z.string().nullable(), userAgent: z.string().nullable() })
@@ -28,24 +28,22 @@ export const ProfilesListed = defineEvent("profiles.listed.v1", {
 });
 
 export const ThemeChanged = defineEvent("profiles.themeChanged.v1", {
-  data: z.object({ profileId: id, theme: themeSchema }).strict(),
+  data: z.object({ profileId: Id, theme: Theme }).strict(),
   refreshesBoard: true,
 });
 
 export const RoleChanged = defineEvent("profiles.roleChanged.v1", {
-  data: z.object({ profileId: id, role: roleSchema }).strict(),
+  data: z.object({ profileId: Id, role: Role }).strict(),
   refreshesBoard: true,
 });
 
 export const InvitationCreated = defineEvent("invitations.created.v1", {
-  data: z
-    .object({ invitationId: id, email: z.string(), role: roleSchema })
-    .strict(),
+  data: z.object({ invitationId: Id, email: z.string(), role: Role }).strict(),
   refreshesBoard: false,
 });
 
 export const InvitationAccepted = defineEvent("invitations.accepted.v1", {
-  data: z.object({ invitationId: id, profileId: id }).strict(),
+  data: z.object({ invitationId: Id, profileId: Id }).strict(),
   refreshesBoard: true,
 });
 
@@ -56,11 +54,11 @@ export const KeysListed = defineEvent("keys.listed.v1", {
 
 /** Crear una key crea su agente, que aparece como persona asignable. */
 export const KeyCreated = defineEvent("keys.created.v1", {
-  data: z.object({ keyId: id, agentId: id, ownerId: id }).strict(),
+  data: z.object({ keyId: Id, agentId: Id, ownerId: Id }).strict(),
   refreshesBoard: true,
 });
 
 export const KeyRevoked = defineEvent("keys.revoked.v1", {
-  data: z.object({ keyId: id, agentId: id }).strict(),
+  data: z.object({ keyId: Id, agentId: Id }).strict(),
   refreshesBoard: false,
 });

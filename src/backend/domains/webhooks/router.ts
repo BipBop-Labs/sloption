@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineEndpoint, defineRouter } from "../../lib/endpoint";
-import { byId, empty, id, ok } from "../kernel";
+import { ById, Empty, Ok } from "../schemas";
 import { webhookErrors } from "./errors";
 import {
   WebhookCreated,
@@ -8,16 +8,13 @@ import {
   WebhookUpdated,
   WebhooksListed,
 } from "./events";
-import { webhookSchema } from "./model";
+import {
+  NewWebhook,
+  Webhook,
+  WebhookChanges,
+  WebhookSummary,
+} from "./schemas";
 import * as webhooks from "./services";
-
-const subscription = z
-  .object({
-    url: z.url().refine((url) => /^https?:\/\//.test(url)),
-    events: z.array(id).min(1),
-    enabled: z.boolean(),
-  })
-  .strict();
 
 export const webhooksRouter = defineRouter({
   name: "webhooks",
@@ -27,23 +24,23 @@ export const webhooksRouter = defineRouter({
     list: defineEndpoint({
       doc: "Webhooks configurados, sin su secreto.",
       access: "admin",
-      input: empty,
-      output: z.array(webhookSchema),
+      input: Empty,
+      output: z.array(WebhookSummary),
       event: WebhooksListed,
     }),
     create: defineEndpoint({
       doc: "Suscribe una URL a eventos (catalog read los lista). Cada entrega va firmada con HMAC-SHA256; el secreto solo se devuelve acá.",
       access: "admin",
-      input: subscription,
-      output: webhookSchema.extend({ secret: z.string() }),
+      input: NewWebhook,
+      output: Webhook,
       event: WebhookCreated,
       errors: webhookErrors,
     }),
     update: defineEndpoint({
       doc: "Cambia URL, eventos o si está activo.",
       access: "admin",
-      input: subscription.extend({ id }),
-      output: webhookSchema,
+      input: WebhookChanges,
+      output: WebhookSummary,
       scope: { load: webhooks.byId, from: (input) => input.id },
       event: WebhookUpdated,
       errors: webhookErrors,
@@ -51,8 +48,8 @@ export const webhooksRouter = defineRouter({
     remove: defineEndpoint({
       doc: "Elimina un webhook. Las entregas pendientes se cancelan.",
       access: "admin",
-      input: byId,
-      output: ok,
+      input: ById,
+      output: Ok,
       event: WebhookRemoved,
     }),
   },

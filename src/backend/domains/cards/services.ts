@@ -1,10 +1,10 @@
 import { raise } from "../../lib/errors";
-import type { Board } from "../boards/model";
-import type { Field } from "../fields/model";
+import type { Board } from "../boards/schemas";
+import type { Field } from "../fields/schemas";
 import * as fields from "../fields/services";
 import type { Deps, Tx } from "../kernel";
 import { cardErrors } from "./errors";
-import type { Card } from "./model";
+import type { Card, NewCard } from "./schemas";
 
 export const byId = (tx: Tx, cardId: string) => tx.get("cards", cardId);
 
@@ -27,11 +27,7 @@ export async function listForView(tx: Tx, view: "week" | "all" | "archived") {
     .map(({ document: _document, markdown: _markdown, ...card }) => card);
 }
 
-export async function create(
-  tx: Tx,
-  deps: Deps,
-  input: { title: string; values: Card["values"]; weekly: boolean },
-) {
+export async function create(tx: Tx, deps: Deps, input: NewCard) {
   await fields.validateValues(tx, input.values);
   const now = deps.now().toISOString();
   const cards = await tx.list("cards");

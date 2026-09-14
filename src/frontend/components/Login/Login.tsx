@@ -9,7 +9,7 @@ export function Login({ invite, onDone }: { invite?: string; onDone(): void }) {
   return (
     <main className="login">
       <h1>Sloption</h1>
-      <p>El tablero de Revi.</p>
+      <p>El tablero del equipo.</p>
       <form
         onSubmit={async (event) => {
           event.preventDefault();

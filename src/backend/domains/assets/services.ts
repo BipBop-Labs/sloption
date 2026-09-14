@@ -1,5 +1,5 @@
 import type { Deps, Tx } from "../kernel";
-import type { Asset } from "./model";
+import type { Asset } from "./schemas";
 
 export const byId = (tx: Tx, assetId: string) => tx.get("assets", assetId);
 

@@ -27,7 +27,7 @@ export function AppSidebar({
     <Sidebar
       open={open}
       onOpenChange={onOpenChange}
-      subtitle="REVI / TAREAS"
+      subtitle="TAREAS"
       title={
         <Link to="/" search={{ view: "week" }}>
           Sloption

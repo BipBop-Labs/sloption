@@ -1,8 +1,8 @@
 import { raise } from "../../lib/errors";
-import type { Field } from "../fields/model";
+import type { Field } from "../fields/schemas";
 import type { Tx } from "../kernel";
 import { boardErrors } from "./errors";
-import type { Board } from "./model";
+import type { Board } from "./schemas";
 
 /** Hoy hay un solo tablero. Con varios por organización, esto recibe el id. */
 export async function requireMain(tx: Tx) {

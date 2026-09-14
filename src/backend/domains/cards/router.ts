@@ -1,8 +1,7 @@
-import { z } from "zod";
 import { defineEndpoint, defineRouter } from "../../lib/endpoint";
 import { boardErrors } from "../boards/errors";
 import { valueErrors } from "../fields/errors";
-import { byId, id } from "../kernel";
+import { ById } from "../schemas";
 import { cardErrors } from "./errors";
 import {
   CardArchivedChanged,
@@ -13,7 +12,15 @@ import {
   CardViewed,
   CardWeeklyChanged,
 } from "./events";
-import { cardSchema, valuesSchema } from "./model";
+import {
+  ArchiveMark,
+  Card,
+  CardChanges,
+  CardPlacement,
+  DocumentUpdate,
+  NewCard,
+  WeeklyMark,
+} from "./schemas";
 import * as cards from "./services";
 
 /** Toda operación sobre una tarjeta existente la carga el runner y responde NOT_FOUND. */
@@ -27,37 +34,24 @@ export const cardsRouter = defineRouter({
     read: defineEndpoint({
       doc: "Lee una tarjeta completa: su Markdown, el documento Yjs y la version que pide cards update.",
       access: "member",
-      input: byId,
-      output: cardSchema,
+      input: ById,
+      output: Card,
       scope: card,
       event: CardViewed,
     }),
     create: defineEndpoint({
       doc: "Crea una tarjeta al final del tablero.",
       access: "member",
-      input: z
-        .object({
-          title: z.string().trim().min(1).max(500),
-          values: valuesSchema.default({}),
-          weekly: z.boolean().default(false),
-        })
-        .strict(),
-      output: cardSchema,
+      input: NewCard,
+      output: Card,
       event: CardCreated,
       errors: valueErrors,
     }),
     update: defineEndpoint({
       doc: "Cambia título o valores. Exige la version de la última lectura; si alguien más tocó la tarjeta responde STALE_VERSION: releé y reintentá.",
       access: "member",
-      input: z
-        .object({
-          id,
-          version: z.number().int().positive(),
-          title: z.string().trim().min(1).max(500).optional(),
-          values: valuesSchema.optional(),
-        })
-        .strict(),
-      output: cardSchema,
+      input: CardChanges,
+      output: Card,
       scope: card,
       event: CardUpdated,
       errors: { ...cardErrors, ...valueErrors },
@@ -65,16 +59,16 @@ export const cardsRouter = defineRouter({
     week: defineEndpoint({
       doc: "Marca o desmarca la tarjeta para esta semana.",
       access: "member",
-      input: z.object({ id, weekly: z.boolean() }).strict(),
-      output: cardSchema,
+      input: WeeklyMark,
+      output: Card,
       scope: card,
       event: CardWeeklyChanged,
     }),
     archive: defineEndpoint({
       doc: "Archiva o restaura. Al archivar guarda la etapa como etiqueta; al restaurar vuelve a esa etapa si todavía existe.",
       access: "member",
-      input: z.object({ id, archived: z.boolean() }).strict(),
-      output: cardSchema,
+      input: ArchiveMark,
+      output: Card,
       scope: card,
       event: CardArchivedChanged,
       errors: boardErrors,
@@ -82,14 +76,8 @@ export const cardsRouter = defineRouter({
     move: defineEndpoint({
       doc: "Mueve la tarjeta a la columna optionId (null: sin etapa), antes de beforeId o al final.",
       access: "member",
-      input: z
-        .object({
-          id,
-          optionId: id.nullable(),
-          beforeId: id.nullable().default(null),
-        })
-        .strict(),
-      output: cardSchema,
+      input: CardPlacement,
+      output: Card,
       scope: card,
       event: CardMoved,
       errors: { ...cardErrors, ...valueErrors, ...boardErrors },
@@ -97,8 +85,8 @@ export const cardsRouter = defineRouter({
     applyDocument: defineEndpoint({
       doc: "Edita el cuerpo: recibe una actualización Yjs en base64 y devuelve la tarjeta con el Markdown resultante.",
       access: "member",
-      input: z.object({ id, update: z.string().min(1).max(3_000_000) }).strict(),
-      output: cardSchema,
+      input: DocumentUpdate,
+      output: Card,
       scope: card,
       event: CardBodyEdited,
       errors: cardErrors,

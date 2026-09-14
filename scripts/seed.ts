@@ -32,7 +32,7 @@ if (!existing) {
     await tx.put("profiles", profile);
     await tx.put("boards", {
       id: "main",
-      name: "Tareas Revi",
+      name: "Tareas",
       groupingId: "status",
     });
     await tx.put("fields", {

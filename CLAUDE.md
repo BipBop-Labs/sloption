@@ -22,27 +22,11 @@ instalar nada. Cuándo usar cada una:
 | `vercel-react-best-practices` | Al escribir o refactorizar componentes. 70 reglas de performance. Ignorá lo que sea de Next.js o del runtime de Vercel — acá es TanStack. |
 | `vercel-composition-patterns` | Al diseñar la API de un componente reusable, o cuando aparece proliferación de props booleanas. |
 | `vercel-web-design-guidelines` | Auditoría de UI: accesibilidad, foco, targets táctiles. Corré esto antes de dar una pantalla por terminada. Descarga las reglas por red al ejecutarse. |
-| `revi-ousterhout-software-design` | **Al elegir el patrón de arquitectura** (regla 4 de AGENTS.md) y en cualquier discusión de profundidad de módulo, ocultamiento de información o diseño de interfaces. Es la que más pesa en la etapa actual. |
-| `revi-pr-review` | Revisar una PR o autorevisarse antes de abrirla. |
-| `revi-microcopy` | Texto de UI: botones, errores, vacíos, confirmaciones. |
-| `revi-best-prompting` | Prompts de agentes, tools o cualquier contenido dirigido a un LLM — incluye los usuarios virtuales de SPEC.md. |
-| `revi-simple-writing` | Texto para gente sin contexto técnico. |
-| `revi-design-system` | **NO aplica a este repo.** Está de referencia del ecosistema Revi. El lenguaje visual de Sloption es el de [VISUAL.md](VISUAL.md) y no hereda de Norman/Clara/Celeste. |
-
-No está vendorizada `daily` — es un ritual de equipo contra Notion, no toca este repo.
-Sigue disponible si tenés el plugin `revi-skills@revi` instalado a nivel usuario.
-
-### Instalar las skills de Revi como plugin (opcional)
-
-La versión vendorizada es una copia congelada. Para seguir la fuente actualizada:
-
-```
-/plugin marketplace add ia-revi/skills
-/plugin install revi-skills@revi
-```
-
-Si preferís eso, borrá las carpetas `revi-*` de `.claude/skills/` para no tener dos
-copias con nombres distintos.
+| `ousterhout-software-design` | **Al elegir el patrón de arquitectura** (regla 4 de AGENTS.md) y en cualquier discusión de profundidad de módulo, ocultamiento de información o diseño de interfaces. Es la que más pesa en la etapa actual. |
+| `pr-review` | Revisar una PR o autorevisarse antes de abrirla. |
+| `microcopy` | Texto de UI: botones, errores, vacíos, confirmaciones. |
+| `best-prompting` | Prompts de agentes, tools o cualquier contenido dirigido a un LLM — incluye los usuarios virtuales de SPEC.md. |
+| `simple-writing` | Texto para gente sin contexto técnico. |
 
 ## Cosas que se olvidan seguido
 

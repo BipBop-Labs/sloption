@@ -71,16 +71,22 @@ emite, y la CLI funciona desde cualquier máquina con una API key. Saca las ruta
 - `orchestrator.ts`: una función por endpoint; `implement` obliga a implementarlas
   todas. Devuelve el output y el payload del evento.
 - `services.ts`: operaciones reutilizables que reciben la transacción.
+- `schemas.ts`: todos los esquemas zod del dominio, cada uno con su tipo bajo el mismo
+  nombre (`Card`, `NewCard`, `CardPlacement`). Se nombran por lo que son, no por su rol
+  en un endpoint. El router solo referencia nombres; las listas se arman ahí mismo
+  (`z.array(Card)`). Un `schemas.ts` puede componer esquemas de otro dominio.
 - `events.ts`: los eventos que emite el dominio.
-- `model.ts` y `errors.ts`.
+- `errors.ts`.
 
 `domains/kernel.ts` es lo compartido: el mapa de colecciones, la transacción y las
-dependencias. Reglas, verificadas por `tests/architecture.test.ts`:
+dependencias. `domains/schemas.ts` tiene los esquemas base (`Id`, `ById`, `Empty`, `Ok`).
+No hay `model.ts`: la forma de guardar es asunto del adaptador de Postgres. Reglas, verificadas por `tests/architecture.test.ts`:
 
 - Un orquestador usa servicios propios y de otros dominios.
 - Los servicios se consumen entre dominios; los orquestadores no. Solo `server/`
   importa orquestadores.
 - `lib/` no conoce ningún dominio.
+- Un `schemas.ts` solo importa otros `schemas.ts`.
 
 ### Errores
 

@@ -1,6 +1,6 @@
 # Sloption
 
-Back office de Revi: kanban compartido, editor colaborativo, API y CLI sobre un núcleo
+Back office: kanban compartido, editor colaborativo, API y CLI sobre un núcleo
 hexagonal. Interfaz en español, código en inglés.
 
 ## Desarrollo

@@ -40,6 +40,15 @@ describe("dependencias del backend", () => {
     ).toEqual([]);
   });
 
+  test("los esquemas solo importan otros esquemas", () => {
+    expect(
+      imports.filter(
+        ({ file, target }) =>
+          file.endsWith("schemas.ts") && !target.endsWith("schemas"),
+      ),
+    ).toEqual([]);
+  });
+
   test("los servicios no importan routers", () => {
     expect(
       imports.filter(

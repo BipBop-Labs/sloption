@@ -1,6 +1,6 @@
 # Estado
 
-**Última actualización:** 2026-09-13
+**Última actualización:** 2026-09-14
 **Fase:** v1 implementada y validada localmente. No desplegada.
 
 ## Implementado
@@ -106,6 +106,34 @@ down -v` y `./dev`). Después, usar la app y recoger ajustes del equipo.
 ## Bitácora
 
 Formato: fecha — qué cambió. Agregá arriba, no abajo.
+
+### 2026-09-14 — Esquemas en `schemas.ts`, sin `model.ts`
+
+- **Un `schemas.ts` por dominio** reemplaza a `model.ts`. "Modelo" sonaba a base de
+  datos, y la forma de guardar es asunto del adaptador de Postgres. Además, desde que el
+  tipo sale del esquema (`z.infer`), modelo y esquema eran lo mismo con dos nombres.
+- **Los routers ya no tienen esquemas inline:** solo referencian nombres. Las listas se
+  arman ahí mismo (`z.array(Profile)`).
+- **Nombres por lo que es, no por su rol:** `NewCard`, `CardPlacement`, `BoardView`,
+  `IssuedKey`. El esquema y su tipo comparten nombre. Se fueron las `interface` escritas
+  a mano (`Key`, `Invitation`, `Webhook`), que duplicaban el esquema.
+- **Composición entre dominios:** `BoardView` usa `Profile`, `CardSummary` y `Field`.
+  Regla nueva en `tests/architecture.test.ts`: un `schemas.ts` solo importa otros
+  `schemas.ts`.
+- **Esquemas base** (`Id`, `ById`, `Empty`, `Ok`) en `domains/schemas.ts`; `kernel.ts`
+  queda con colecciones, transacción, dependencias e `implement`.
+- **`properties.ts` desaparece.** `parsePropertyValue` pasó a `fields/services.ts` como
+  `parseValue`. `removeOptionReference` era código muerto: solo lo usaba su test.
+- **Los payloads de eventos siguen en `events.ts`**, reusando esquemas como `Id`, `Role`
+  y `FieldType`.
+
+Verificación: typecheck, build, 43 tests unitarios y E2E 5/5 con el backend reconstruido.
+
+### 2026-09-14 — Sloption es solo Sloption
+
+- Se quitaron las menciones a Revi de docs, UI (título, login, sidebar), seed y skills.
+- `.claude/skills/`: se borró `design-system` (no aplicaba) y las demás perdieron el
+  prefijo `revi-`. `microcopy` usa ejemplos de Sloption.
 
 ### 2026-09-13 — Eventos en su propio archivo, sin importación de Notion
 
@@ -517,8 +545,8 @@ Si se vuelve a mover código del frontend, cargá la app: el typecheck no alcanz
   las cuatro aplicables (`composition-patterns`, `react-best-practices`,
   `react-view-transitions`, `web-design-guidelines`) con prefijo `vercel-`; se
   descartaron `deploy-to-vercel`, `vercel-cli-with-tokens`, `vercel-optimize` (el
-  despliegue es Coolify) y `react-native-skills`. De `ia-revi/skills` se tomaron seis con
-  prefijo `revi-`; se omitió `daily` por ser un ritual de equipo ajeno al repo.
+  despliegue es Coolify) y `react-native-skills`. Se sumaron cinco skills
+  más de escritura, prompting, review y diseño de software.
 - **Favicon**: `public/favicon.svg` — cuadrado redondeado blanco con borde negro y una "S"
   geométrica, guiño al ícono de Notion. Linkeado desde `index.html`. Primer archivo en
   `public/` (Vite lo copia a `dist/web` en el build).
