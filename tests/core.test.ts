@@ -1,114 +1,306 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
-  createActionRunner,
-  type ActionEvent,
-  type Actor,
-} from "../src/core/actions";
+  createCatalog,
+  listEndpoints,
+  listEvents,
+} from "../src/backend/lib/catalog";
 import {
-  parsePropertyValue,
-  removeOptionReference,
-  type Property,
-} from "../src/core/properties";
+  defineEndpoint,
+  defineEvent,
+  defineRouter,
+  implement,
+  type ActionEvent,
+  type Caller,
+} from "../src/backend/lib/endpoint";
+import { defineErrors } from "../src/backend/lib/errors";
+import type { Field } from "../src/backend/domains/fields/schemas";
+import { parseValue } from "../src/backend/domains/fields/services";
 
-const actor: Actor = {
+interface Member extends Caller {
+  orgId: string;
+  agentId: string | null;
+  apiKeyId: string | null;
+}
+
+const member: Member = {
   userId: "owner",
+  orgId: "main",
   role: "member",
   agentId: "agent",
   apiKeyId: "key",
 };
 
-function fixture(failEvent = false) {
-  let storedValue = 0;
-  const events: ActionEvent[] = [];
-  const run = createActionRunner({
-    now: () => new Date("2026-09-08T12:00:00Z"),
-    newId: () => "2d3fc8b4-9a11-4b77-a828-45fed3d69e71",
+interface Note {
+  id: string;
+  ownerId: string;
+}
+interface SampleTx {
+  setValue(value: number): void;
+  notes: Map<string, Note>;
+  published: ActionEvent[];
+}
+
+const ValueChanged = defineEvent("sample.valueChanged.v1", {
+  data: z.object({ value: z.number() }).strict(),
+  refreshesBoard: true,
+});
+const NoteViewed = defineEvent("sample.noteViewed.v1", {
+  data: z.object({ noteId: z.string() }).strict(),
+  refreshesBoard: false,
+});
+
+const sampleRouter = defineRouter({
+  name: "sample",
+  http: "/api/sample",
+  cli: "sample",
+  endpoints: {
+    set: defineEndpoint({
+      doc: "Guarda un número.",
+      access: "member",
+      input: z.object({ value: z.number() }).strict(),
+      output: z.number(),
+      event: ValueChanged,
+      errors: defineErrors({ TOO_BIG: { kind: "CONFLICT", message: "Too big" } }),
+    }),
+    double: defineEndpoint({
+      doc: "Guarda el doble: emite el mismo evento que set.",
+      access: "member",
+      input: z.object({ value: z.number() }).strict(),
+      output: z.number(),
+      event: ValueChanged,
+    }),
+    wipe: defineEndpoint({
+      doc: "Solo admins.",
+      access: "admin",
+      input: z.object({}).strict(),
+      output: z.literal("ok"),
+      event: null,
+    }),
+    ping: defineEndpoint({
+      doc: "Sin sesión y sin evento.",
+      http: { method: "GET", path: "/ping" },
+      access: "public",
+      input: z.object({}).strict(),
+      output: z.literal("pong"),
+      event: null,
+    }),
+    note: defineEndpoint({
+      doc: "Lee una nota propia.",
+      access: "member",
+      input: z.object({ id: z.string() }).strict(),
+      output: z.string(),
+      scope: {
+        load: async (tx: SampleTx, id: string) => tx.notes.get(id) ?? null,
+        from: (input) => input.id,
+        allow: (actor, note) => note.ownerId === actor.userId,
+      },
+      event: NoteViewed,
+    }),
+  },
+});
+
+function fixture({
+  failPublish = false,
+  actor = member as Member | null,
+} = {}) {
+  let stored = 0;
+  const published: ActionEvent[] = [];
+  const notes = new Map<string, Note>([
+    ["mine", { id: "mine", ownerId: "owner" }],
+    ["theirs", { id: "theirs", ownerId: "someone" }],
+  ]);
+  const module = implement<typeof sampleRouter, SampleTx, unknown, Member>(
+    sampleRouter,
+    {
+      async set(input, { tx, fail }) {
+        if (input.value > 100) fail("TOO_BIG");
+        tx.setValue(input.value);
+        return { output: input.value, event: ValueChanged(input) };
+      },
+      async double(input, { tx }) {
+        tx.setValue(input.value * 2);
+        return {
+          output: input.value * 2,
+          event: ValueChanged({ value: input.value * 2 }),
+        };
+      },
+      async wipe() {
+        return { output: "ok" };
+      },
+      async ping() {
+        return { output: "pong" };
+      },
+      async note(_input, { resource }) {
+        return {
+          output: resource.id,
+          event: NoteViewed({ noteId: resource.id }),
+        };
+      },
+    },
+  );
+  const catalog = createCatalog<SampleTx, Member>({
+    modules: [module],
+    // Confirma el valor y los eventos solo si la operación termina.
     unitOfWork: {
-      async transaction<T>(
-        operation: (tx: {
-          setValue(value: number): void;
-          appendEvent(event: ActionEvent): Promise<void>;
-        }) => Promise<T>,
-      ) {
-        let pendingValue = storedValue;
-        const pendingEvents: ActionEvent[] = [];
+      async transaction(operation) {
+        let pending = stored;
+        const events: ActionEvent[] = [];
         const result = await operation({
           setValue: (value) => {
-            pendingValue = value;
+            pending = value;
           },
-          async appendEvent(event) {
-            if (failEvent) throw new Error("Storage failure");
-            pendingEvents.push(event);
-          },
+          notes,
+          published: events,
         });
-        storedValue = pendingValue;
-        events.push(...pendingEvents);
+        stored = pending;
+        published.push(...events);
         return result;
       },
     },
+    authenticator: { resolve: async () => actor },
+    publish: async (tx, event) => {
+      if (failPublish) throw new Error("Storage failure");
+      tx.published.push(event);
+    },
+    deps: {},
+    newId: () => "2d3fc8b4-9a11-4b77-a828-45fed3d69e71",
+    now: () => new Date("2026-09-08T12:00:00Z"),
   });
-  const action = {
-    name: "sample.set",
-    access: "member" as const,
-    input: z.object({ value: z.number() }).strict(),
-    output: z.number(),
-    event: {
-      type: "sample.changed.v1",
-      data: z.object({ value: z.number() }).strict(),
-    },
-    async execute(
-      input: { value: number },
-      _actor: Actor,
-      tx: { setValue(value: number): void },
-    ) {
-      tx.setValue(input.value);
-      return { output: input.value, eventData: input };
-    },
-  };
-  return { run, action, events, value: () => storedValue };
+  const call = (name: string, input: unknown) =>
+    catalog.execute(name, input, { kind: "apiKey", token: "t" });
+  return { call, catalog, published, value: () => stored };
 }
 
-describe("action boundary", () => {
-  it("records both the owner and agent on a successful action", async () => {
+describe("runner", () => {
+  it("publica el evento con dueño y agente", async () => {
     const f = fixture();
-    expect(await f.run(f.action, { value: 7 }, actor)).toBe(7);
-    expect(f.events).toHaveLength(1);
-    expect(f.events[0]?.actor).toEqual(actor);
+    expect(await f.call("sample.set", { value: 7 })).toBe(7);
+    expect(f.published).toHaveLength(1);
+    expect(f.published[0]).toMatchObject({
+      type: "sample.valueChanged.v1",
+      actor: member,
+      data: { value: 7 },
+    });
     expect(f.value()).toBe(7);
   });
 
-  it("does not commit a change when its event cannot be stored", async () => {
-    const f = fixture(true);
-    await expect(f.run(f.action, { value: 7 }, actor)).rejects.toThrow(
+  it("no confirma el cambio si el evento no se pudo publicar", async () => {
+    const f = fixture({ failPublish: true });
+    await expect(f.call("sample.set", { value: 7 })).rejects.toThrow(
       "Storage failure",
     );
     expect(f.value()).toBe(0);
-    expect(f.events).toEqual([]);
+    expect(f.published).toEqual([]);
   });
 
-  it("rejects unauthenticated and unauthorized calls before execution", async () => {
-    const f = fixture();
-    await expect(f.run(f.action, { value: 7 }, null)).rejects.toMatchObject({
-      code: "UNAUTHENTICATED",
-    });
+  it("rechaza sin sesión y sin rol antes de ejecutar", async () => {
     await expect(
-      f.run({ ...f.action, access: "admin" }, { value: 7 }, actor),
-    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      fixture({ actor: null }).call("sample.set", { value: 7 }),
+    ).rejects.toMatchObject({ kind: "UNAUTHENTICATED" });
+    await expect(fixture().call("sample.wipe", {})).rejects.toMatchObject({
+      kind: "FORBIDDEN",
+    });
+  });
+
+  it("rechaza entradas mal formadas sin eventos ni cambios", async () => {
+    const f = fixture();
+    await expect(f.call("sample.set", { value: "7" })).rejects.toMatchObject({
+      kind: "INVALID_INPUT",
+    });
+    expect(f.published).toEqual([]);
+  });
+
+  it("un error declarado lleva su código y su kind", async () => {
+    const f = fixture();
+    await expect(f.call("sample.set", { value: 101 })).rejects.toMatchObject({
+      code: "TOO_BIG",
+      kind: "CONFLICT",
+    });
     expect(f.value()).toBe(0);
   });
 
-  it("rejects malformed inputs without events or state changes", async () => {
+  it("un endpoint público pasa sin sesión, y event null no publica", async () => {
+    const f = fixture({ actor: null });
+    expect(await f.call("sample.ping", {})).toBe("pong");
+    expect(f.published).toEqual([]);
+  });
+
+  it("scope: carga, autoriza e inyecta el recurso", async () => {
     const f = fixture();
-    await expect(f.run(f.action, { value: "7" }, actor)).rejects.toMatchObject({
-      code: "INVALID_INPUT",
+    expect(await f.call("sample.note", { id: "mine" })).toBe("mine");
+    await expect(f.call("sample.note", { id: "missing" })).rejects.toMatchObject(
+      { kind: "NOT_FOUND" },
+    );
+    await expect(f.call("sample.note", { id: "theirs" })).rejects.toMatchObject({
+      kind: "FORBIDDEN",
     });
-    expect(f.events).toEqual([]);
+    expect(f.published.map((event) => event.data)).toEqual([
+      { noteId: "mine" },
+    ]);
+  });
+
+  it("deriva nombre, ruta, comando y evento", () => {
+    const entries = fixture().catalog.entries;
+    expect(entries.find((entry) => entry.name === "sample.set")).toMatchObject({
+      cli: "sample set",
+      http: { method: "POST", path: "/api/sample/set" },
+      event: "sample.valueChanged.v1",
+    });
+    expect(entries.find((entry) => entry.name === "sample.ping")).toMatchObject({
+      http: { method: "GET", path: "/api/sample/ping" },
+      event: null,
+    });
+  });
+
+  it("un endpoint repetido rompe al arrancar", () => {
+    expect(() => listEndpoints([sampleRouter, sampleRouter])).toThrow(
+      "Endpoint repetido",
+    );
   });
 });
 
-describe("property values", () => {
-  const property: Property = {
+describe("eventos", () => {
+  it("un mismo evento sale de dos endpoints y el catálogo lo lista una vez", async () => {
+    const f = fixture();
+    await f.call("sample.set", { value: 1 });
+    await f.call("sample.double", { value: 2 });
+    expect(f.published.map((event) => [event.type, event.data])).toEqual([
+      ["sample.valueChanged.v1", { value: 1 }],
+      ["sample.valueChanged.v1", { value: 4 }],
+    ]);
+    expect(
+      f.catalog.events.filter((type) => type === "sample.valueChanged.v1"),
+    ).toHaveLength(1);
+  });
+
+  it("construirlo valida el payload", () => {
+    expect(() => ValueChanged({ value: "7" as unknown as number })).toThrow();
+  });
+
+  it("dos definiciones con el mismo tipo rompen al arrancar", () => {
+    const Impostor = defineEvent("sample.valueChanged.v1", {
+      data: z.object({ other: z.string() }).strict(),
+      refreshesBoard: false,
+    });
+    expect(() => listEvents([ValueChanged, Impostor])).toThrow(
+      "Evento definido dos veces",
+    );
+    expect(listEvents([ValueChanged, null, ValueChanged])).toHaveLength(1);
+  });
+
+  it("el tipo tiene dominio, nombre y versión", () => {
+    expect(() =>
+      defineEvent("sin-version", {
+        data: z.object({}).strict(),
+        refreshesBoard: false,
+      }),
+    ).toThrow("Tipo de evento inválido");
+  });
+});
+
+describe("valores de propiedades", () => {
+  const field: Field = {
     id: "category",
     name: "Categoría",
     type: "multiSelect",
@@ -117,32 +309,18 @@ describe("property values", () => {
       { id: "product", label: "Producto" },
     ],
   };
-  it("accepts empty values and rejects dangling selections", () => {
-    expect(parsePropertyValue(property, null, new Set())).toBeNull();
-    expect(parsePropertyValue(property, ["swe"], new Set())).toEqual(["swe"]);
-    expect(() =>
-      parsePropertyValue(property, ["missing"], new Set()),
-    ).toThrow();
-    expect(() =>
-      parsePropertyValue(property, ["swe", "swe"], new Set()),
-    ).toThrow();
+  it("acepta vacío y rechaza selecciones que no existen", () => {
+    expect(parseValue(field, null)).toBeNull();
+    expect(parseValue(field, ["swe"])).toEqual(["swe"]);
+    expect(() => parseValue(field, ["missing"])).toThrow();
+    expect(() => parseValue(field, ["swe", "swe"])).toThrow();
   });
-  it("clears only the removed option", () => {
-    expect(removeOptionReference(["swe", "product"], "swe")).toEqual([
-      "product",
-    ]);
-    expect(removeOptionReference("swe", "swe")).toBeNull();
-  });
-  it("validates calendar dates and finite numbers", () => {
+  it("valida fechas de calendario y números finitos", () => {
     expect(() =>
-      parsePropertyValue(
-        { ...property, type: "date" },
-        "2026-02-30",
-        new Set(),
-      ),
+      parseValue({ ...field, type: "date" }, "2026-02-30"),
     ).toThrow();
     expect(() =>
-      parsePropertyValue({ ...property, type: "number" }, Infinity, new Set()),
+      parseValue({ ...field, type: "number" }, Infinity),
     ).toThrow();
   });
 });

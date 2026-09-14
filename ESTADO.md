@@ -1,21 +1,24 @@
 # Estado
 
-**Última actualización:** 2026-09-08
+**Última actualización:** 2026-09-14
 **Fase:** v1 implementada y validada localmente. No desplegada.
 
 ## Implementado
 
-- Arquitectura hexagonal documentada en CODE.md; TanStack Router/Query + Hono.
+- Arquitectura hexagonal cortada por dominio (router, orquestador, servicios),
+  documentada en CODE.md; TanStack Router/Query + Hono.
 - PostgreSQL y Drizzle, migraciones y seed transaccional de administrador.
 - Kanban, orden manual, marca semanal manual, archivo y restauración.
 - Propiedades tipadas configurables; selección simple y múltiple mediante dropdowns.
 - Editor visual Tiptap con imágenes, colaboración Yjs y Markdown persistido.
-- Acciones comunes por HTTP y CLI, autorización de admins/miembros y auditoría.
+- Endpoints comunes por HTTP y CLI, autorización de admins/miembros; cada uno declara
+  su evento con payload propio.
 - Invitaciones de un uso sin email, vinculación de identidades importadas.
-- Agentes con API keys revocables, sin vencimiento; auditoría del agente y su dueño.
-- Webhooks con firma HMAC, outbox durable y reintentos.
-- Historial de eventos en su propia vista (`/?view=history`): tabla paginada por
-  cursor. Sincronización SSE con recuperación por cursor.
+- Agentes con API keys revocables, sin vencimiento; los eventos identifican al agente y
+  a su dueño.
+- Webhooks con firma HMAC, outbox durable y reintentos. Son la única salida de los
+  eventos: no hay historial. Login y logout emiten evento con IP y dispositivo.
+- Sincronización SSE: aviso de cambio y recarga completa al reconectar.
 - Drawer lateral, chips, apariencia similar a shadcn y tokens claro/oscuro.
   Tema persistido por usuario mediante acción. Esta indicación reemplazó Dell.
 - Hover de tarjeta con borde `--info`; al arrastrar, la tarjeta sale del flujo y
@@ -24,7 +27,7 @@
   solo para admins. Diálogo de confirmación e iconos reutilizables.
 - Columnas reordenables con el mismo gesto que las tarjetas: se agarran por el
   encabezado, salen del flujo y las vecinas abren el hueco donde caerían.
-  Alt+flechas para el teclado. Es `field.update` con las opciones en otro orden,
+  Alt+flechas para el teclado. Es `boards.setStates` con las etapas en otro orden,
   así que la CLI reordena igual; el tablero se dibuja optimista.
 - Eliminar una etapa siempre pide escribir su nombre (`challenge` de
   `useConfirm`). La columna solo muestra las tarjetas de la vista y el filtro
@@ -47,16 +50,33 @@
 - Compose de desarrollo (DB + backend), frontend local y Compose de producción sin
   puertos publicados. Imagen de producción probada localmente, web y health HTTP 200.
 
+## Roadmap
+
+Después del refactor a dominios (plan del 2026-09-13):
+
+1. **Organizaciones.** Crear una y pertenecer a ella, con un rol por organización. Los
+   objetos pertenecen a la organización: el tablero pertenece a la org y la tarea al
+   tablero. Para leer una tarea hay que ser miembro de la org y tener acceso al tablero.
+2. **Varios tableros por organización, de varios tipos:** tareas (el actual),
+   calendario, hitos y lista de entradas. El admin define quién accede a cada tablero.
+3. **Una persona en varias organizaciones.** Es lo más difícil y puede que no se haga
+   nunca. La alternativa es un deploy completo de la app por organización.
+
+Lo que deja listo el refactor: `orgId` en el actor y `scope` en los endpoints (el
+runner carga el recurso, autoriza y se lo pasa al orquestador). El puerto
+`Authorizer.can(actor, boardId)` y las listas filtradas por acceso se agregan con las
+organizaciones: hoy no tendrían nada que decidir.
+
 ## Datos locales
 
-Se importaron las 1006 tarjetas de los dos ZIP recibidos: 227 cuerpos asociados, 779
-marcados como ausentes y cinco imágenes. Se omitieron dependencias, relaciones y
-cálculos de otras bases. Las siete identidades del export se crearon como miembros sin
-acceso; Eduardo Esquivel quedó excluido. Fechas originales conservadas como texto.
+El tablero viejo de Notion se descartó. El seed crea el admin inicial de `.env` y un
+tablero base con las etapas not started, in progress y done, más la propiedad
+Prioridad. Solo corre si todavía no hay un admin con acceso. La base de desarrollo se
+vació el 2026-09-14 con la migración nueva.
 
-El frontend corre en http://localhost:5173. `.env` contiene credenciales locales
-aleatorias y el admin `admin@sloption.local`; el archivo está ignorado por Git.
-README.md explica arranque, importación, CLI y configuración para Coolify.
+El frontend corre en http://localhost:5173. `.env` contiene las credenciales locales;
+el archivo está ignorado por Git. README.md explica arranque, CLI y configuración para
+Coolify.
 
 ## Verificación y límites
 
@@ -69,7 +89,6 @@ README.md explica arranque, importación, CLI y configuración para Coolify.
   integración. No ejecutar contra producción.
 - El editor se carga aparte (aprox. 160 KB gzip). No se ha hecho una medición formal
   de los presupuestos de latencia/CLS ni una prueba de carga multiusuario.
-- No se reconstruyen cuerpos ausentes ni relaciones externas de Notion.
 - No se desplegó a Coolify. La configuración usa el origen APP_URL y la red del proxy.
 
 - Validación final: TypeScript y build aprobados; 11 tests unitarios, dos flujos
@@ -80,11 +99,145 @@ README.md explica arranque, importación, CLI y configuración para Coolify.
 
 ## Próximo paso
 
-Usar la app y recoger ajustes del equipo. Mantener paridad UI/API/CLI en cada cambio.
+Probar a mano el tablero con las etapas nuevas: crear, asignar, filtrar por responsable
+y prioridad, agregar y reordenar etapas. Después, usar la app y recoger ajustes del
+equipo.
 
 ## Bitácora
 
 Formato: fecha — qué cambió. Agregá arriba, no abajo.
+
+### 2026-09-14 — Tablas reales por dominio, sin json
+
+- **Se fue `records`**, la tabla genérica con un JSONB por entidad. Ahora hay 16 tablas
+  con foreign keys, cada una en el `models.ts` de su dominio, incluidas las de BetterAuth.
+  Migraciones reiniciadas: `drizzle/0000_init.sql`. La base de desarrollo se vació.
+- **Los servicios consultan Drizzle directo** (`tx.sql`). Se fueron el store genérico
+  (`get`/`list`/`put` por colección) y el mapa `Entities`.
+- **Tarjeta híbrida:** columnas base (`title`, `board_id`, `state_id`, `rank`, `weekly`,
+  `archived`…), `card_assignees` con foreign key a `profiles`, y un solo jsonb,
+  `cards.properties`, para las propiedades que define cada tablero, validado contra
+  `fields`.
+- **Las columnas del kanban son los estados del tablero** (`board_states`). Se fue la
+  agrupación configurable: `boards.configure` y `groupingId` desaparecen, y
+  `boards.setStates` agrega, reordena y quita etapas. Quitar una deja sus tarjetas sin
+  estado por la foreign key.
+- **Asignar es un endpoint**: `cards.assign` emite `cards.assigneesChanged.v1` con quién
+  entró y quién salió. Es el caso de un agente que se entera.
+- **Filtros del frontend:** por responsable y por propiedades de selección; nunca por
+  etapa.
+- **Webhooks sin persistir:** entrega en memoria después del commit, con reintentos. Se
+  fueron `deliveries` y el worker; un reinicio pierde lo pendiente.
+- **`lib/` no define modelos:** el `Actor` pasó a `auth/schemas.ts` y `lib/` solo conoce
+  `{ userId, role }`. Tests de arquitectura nuevos: `models.ts` solo importa modelos y
+  `lib/` no toca Drizzle.
+- **Se fueron `sourceId` y `bodyMissing`**, restos de la importación de Notion.
+- Los tests unitarios con store en memoria (`archive`, `identity`) no aplican con Drizzle
+  directo: archivar quedó como función pura (`archiveTransition`, en `tests/cards.test.ts`)
+  y auth se cubre en los E2E.
+
+Verificación: typecheck, build, 41 tests unitarios y E2E 5/5 contra la base nueva.
+
+### 2026-09-14 — Esquemas en `schemas.ts`, sin `model.ts`
+
+- **Un `schemas.ts` por dominio** reemplaza a `model.ts`. "Modelo" sonaba a base de
+  datos, y la forma de guardar es asunto del adaptador de Postgres. Además, desde que el
+  tipo sale del esquema (`z.infer`), modelo y esquema eran lo mismo con dos nombres.
+- **Los routers ya no tienen esquemas inline:** solo referencian nombres. Las listas se
+  arman ahí mismo (`z.array(Profile)`).
+- **Nombres por lo que es, no por su rol:** `NewCard`, `CardPlacement`, `BoardView`,
+  `IssuedKey`. El esquema y su tipo comparten nombre. Se fueron las `interface` escritas
+  a mano (`Key`, `Invitation`, `Webhook`), que duplicaban el esquema.
+- **Composición entre dominios:** `BoardView` usa `Profile`, `CardSummary` y `Field`.
+  Regla nueva en `tests/architecture.test.ts`: un `schemas.ts` solo importa otros
+  `schemas.ts`.
+- **Esquemas base** (`Id`, `ById`, `Empty`, `Ok`) en `domains/schemas.ts`; `kernel.ts`
+  queda con colecciones, transacción, dependencias e `implement`.
+- **`properties.ts` desaparece.** `parsePropertyValue` pasó a `fields/services.ts` como
+  `parseValue`. `removeOptionReference` era código muerto: solo lo usaba su test.
+- **Los payloads de eventos siguen en `events.ts`**, reusando esquemas como `Id`, `Role`
+  y `FieldType`.
+
+Verificación: typecheck, build, 43 tests unitarios y E2E 5/5 con el backend reconstruido.
+
+### 2026-09-14 — Sloption es solo Sloption
+
+- Se quitaron las menciones a Revi de docs, UI (título, login, sidebar), seed y skills.
+- `.claude/skills/`: se borró `design-system` (no aplicaba) y las demás perdieron el
+  prefijo `revi-`. `microcopy` usa ejemplos de Sloption.
+
+### 2026-09-13 — Eventos en su propio archivo, sin importación de Notion
+
+- **`events.ts` por dominio.** `defineEvent("cards.moved.v1", { data, refreshesBoard })`
+  define el evento; el router lo referencia (`event: CardMoved`) y el orquestador lo
+  construye (`event: CardMoved({...})`), lo que valida el payload en esa línea.
+  TypeScript exige devolver exactamente el evento del endpoint.
+- **El evento tiene nombre propio**, no el del endpoint: renombrar un endpoint no rompe
+  webhooks, y un evento puede salir de varios endpoints (`cards create` y un futuro
+  `cards batchCreate`). El catálogo lo lista una vez; dos definiciones distintas con el
+  mismo nombre rompen al arrancar.
+- **Nombres nuevos, en pasado:** `cards.created.v1`, `cards.moved.v1`,
+  `cards.archivedChanged.v1`, `auth.signedIn.v1`… La lista está en ACTIONS.md.
+- **Sin importación de Notion:** se borraron el dominio `imports`, `import-notion.ts`,
+  `adm-zip` y `csv-parse`. El tablero viejo se descarta.
+- **Seed:** tablero base con not started, in progress y done.
+- **Docker:** se borraron el contenedor `backoffice-db-1` y el volumen
+  `backoffice_postgres-dev`.
+- `app.spec` ya no depende del nombre de las etapas: usa la primera columna.
+
+Verificación: typecheck, build, 43 tests unitarios (4 nuevos de eventos: reuso entre
+endpoints, validación al construir, nombre duplicado y formato) y E2E 5/5 con el backend
+reconstruido.
+
+### 2026-09-13 — Backend por dominios, eventos a webhooks, sin historial
+
+- **`src/frontend/` y `src/backend/`.** El frontend no cambió por dentro.
+- **Wrapper en `src/backend/lib/`.** `defineRouter` + `defineEndpoint` declaran cada
+  endpoint una vez; de ahí salen la acción, la ruta HTTP, el comando CLI, el evento y la
+  entrada del catálogo. `createCatalog` es el runner. `service.ts` (827 líneas) se partió
+  en siete dominios con `router.ts`, `orchestrator.ts` y `services.ts`.
+  `tests/architecture.test.ts` verifica que los orquestadores no se importan entre sí y
+  que `lib/` no conoce dominios.
+- **auth es un dominio** e implementa el puerto `Authenticator`. Permisos por recurso con
+  `scope`: el runner carga, autoriza e inyecta (hoy: `keys revoke` solo del dueño, y
+  NOT_FOUND de toda operación sobre una tarjeta).
+- **Errores por dominio**, con código propio y `kind` genérico: `{error:{code,kind,message}}`.
+- **Eventos con payload propio** (`cards.move.v1` trae `fromOptionId` y `toOptionId`), en
+  `.v1` porque estamos en beta. `session.me` declara `event: null`.
+- **Sin historial.** Migración `0002`: se borra la tabla `events` y `deliveries` guarda
+  el payload; lo entregado se borra. Se fueron la vista de historial, `history.list`, el
+  cursor SSE y `wake-signal.ts`.
+- **Sesión:** `auth.login.v1` y `auth.logout.v1` con IP (último valor de
+  `X-Forwarded-For`) y user agent. Se eliminaron `auth.session.v1`, `stream.open.v1`,
+  `invitation.accept` como ruta a mano y `system.seed.v1`. Login y logout siguen en
+  BetterAuth, fuera del catálogo, por su rate limit y la cookie HttpOnly.
+- **Nombres nuevos, sin compatibilidad:** `card.*` → `cards.*`, `document.apply` →
+  `cards.applyDocument`, `key.*` → `keys.*`, etc. `POST /api/actions/:name` ya no existe.
+  La CLI acepta `sloption cards move` y `sloption cards.move`, y saca las rutas de
+  `catalog.read`. Los webhooks suscritos a nombres viejos dejan de recibir.
+
+Verificación: typecheck, build, 39 tests unitarios (runner, scope, errores, auth,
+archivo, arquitectura) y un smoke que monta las 29 rutas. Migración `0002` aplicada por
+el backend de Docker al arrancar. E2E: `api.spec` 2/2, `app.spec` 3/3 repetido y
+`drag-slot.spec` 2/2.
+
+Arreglos en los E2E, ninguno por el refactor:
+
+- `app.spec` suponía tarjetas semanales en la base; ahora crea la suya.
+- `app.spec` no aceptaba la confirmación de archivar, que existe desde `120c86d`.
+- `app.spec` apretaba Enter sobre la tarjeta recién creada, pero el composer ya abre el
+  drawer y el Enter a veces lo cerraba. Fallaba en un paso distinto cada corrida.
+- `api.spec` buscaba la red `backoffice_default`. Con Docker Desktop el gateway de la
+  red queda dentro de la VM: el receptor del webhook se alcanza por
+  `host.docker.internal`.
+
+Entorno:
+
+- Al renombrar la carpeta a `sloption`, compose pasó a ser otro proyecto con otro
+  volumen, `sloption_postgres-dev`, que arrancó vacío. Las 1006 tarjetas importadas
+  siguen en `backoffice_postgres-dev`.
+- El login de BetterAuth permite 10 intentos por minuto. Correr E2E seguidos lo agota y
+  el test falla en el login con "Demasiados intentos".
 
 ### 2026-09-08 — Revisión Ousterhout del backend: identidad, límites y auditoría
 
@@ -423,8 +576,8 @@ Si se vuelve a mover código del frontend, cargá la app: el typecheck no alcanz
   las cuatro aplicables (`composition-patterns`, `react-best-practices`,
   `react-view-transitions`, `web-design-guidelines`) con prefijo `vercel-`; se
   descartaron `deploy-to-vercel`, `vercel-cli-with-tokens`, `vercel-optimize` (el
-  despliegue es Coolify) y `react-native-skills`. De `ia-revi/skills` se tomaron seis con
-  prefijo `revi-`; se omitió `daily` por ser un ritual de equipo ajeno al repo.
+  despliegue es Coolify) y `react-native-skills`. Se sumaron cinco skills
+  más de escritura, prompting, review y diseño de software.
 - **Favicon**: `public/favicon.svg` — cuadrado redondeado blanco con borde negro y una "S"
   geométrica, guiño al ícono de Notion. Linkeado desde `index.html`. Primer archivo en
   `public/` (Vite lo copia a `dist/web` en el build).

@@ -1,6 +1,6 @@
 # Sloption
 
-Back office de Revi: kanban compartido, editor colaborativo, API y CLI sobre un núcleo
+Back office: kanban compartido, editor colaborativo, API y CLI sobre un núcleo
 hexagonal. Interfaz en español, código en inglés.
 
 ## Desarrollo
@@ -37,14 +37,13 @@ No se ha desplegado a Coolify.
 
 ## Usuarios
 
-Solo un administrador puede invitar, vincular identidades importadas, cambiar roles,
+Solo un administrador puede invitar, cambiar roles,
 configurar propiedades y webhooks. Los miembros pueden trabajar en el tablero y crear
 sus propias claves de agentes. Las invitaciones generan un enlace para compartir,
 sin enviar correo. Se consumen una sola vez.
 
-Las identidades importadas no pueden iniciar sesión hasta vincularse con una invitación.
-Las claves no vencen, se pueden revocar y heredan el rol actual del dueño. La auditoría
-incluye el dueño, el agente y el ID de la clave, nunca su secreto.
+Las claves no vencen, se pueden revocar y heredan el rol actual del dueño. Los eventos
+incluyen el dueño, el agente y el ID de la clave, nunca su secreto.
 
 ## CLI y API
 
@@ -63,57 +62,44 @@ Si `~/.local/bin` no está en el PATH, elegí otro destino con
 ```sh
 export SLOPTION_URL=http://localhost:5173
 export SLOPTION_API_KEY=...
-sloption help
-sloption catalog.read '{}'
-sloption board.read '{"view":"week"}'
-sloption card.create '{"title":"Nueva tarea","weekly":true}'
-sloption card.read '{"id":"..."}'
-sloption card.move '{"id":"...","optionId":"cooking","beforeId":null}'
-sloption card.week '{"id":"...","weekly":false}'
-sloption profile.preferences '{"theme":"dark"}'
+sloption help                # con credenciales, lista todos los comandos
+sloption catalog read
+sloption boards read '{"view":"week"}'
+sloption cards create '{"title":"Nueva tarea","weekly":true}'
+sloption cards read '{"id":"..."}'
+sloption cards move '{"id":"...","stateId":"...","beforeId":null}'
+sloption cards assign '{"id":"...","assignees":["..."]}'
+sloption cards week '{"id":"...","weekly":false}'
+sloption profiles preferences '{"theme":"dark"}'
 ```
 
-Cada acción se expone en `POST /api/actions/<nombre>`, con JSON y autenticación por
-cookie o `Authorization: Bearer ...`. `catalog.read` describe inputs, outputs y eventos.
-Un argumento `@archivo.json` permite enviar documentos largos desde CLI.
+Cada endpoint tiene su ruta, por defecto `POST /api/<base>/<nombre>` (`cards move` es
+`POST /api/cards/move`), con JSON y autenticación por cookie o `Authorization: Bearer ...`.
+`catalog read` describe inputs, outputs, errores y el payload de cada evento; la CLI saca
+las rutas de ahí. Un argumento `@archivo.json` permite enviar documentos largos desde CLI.
 
-`sloption auth.login @credenciales.json` devuelve la cookie; también se puede usar
-`SLOPTION_COOKIE` en lugar de una API key. `auth.logout` e `invitation.accept` están
+`sloption session login @credenciales.json` devuelve la cookie; también se puede usar
+`SLOPTION_COOKIE` en lugar de una API key. `session logout` e `invitations accept` están
 disponibles sin navegador. Si apuntas directamente al puerto aleatorio del backend,
 configura `SLOPTION_ORIGIN` con el `APP_URL` esperado.
 
-## Importación de Notion
-
-```sh
-pnpm import:notion --dry-run /ruta/export-1.zip /ruta/export-2.zip
-pnpm import:notion /ruta/export-1.zip /ruta/export-2.zip
-```
-
-Usa `SLOPTION_URL` y `SLOPTION_API_KEY` de un administrador, o su `SLOPTION_COOKIE`.
-La importación se ejecuta como `import.apply`; los ZIP se leen sin extraer rutas al
-filesystem. Repetir los mismos exports no duplica tarjetas ni perfiles.
-
-Los exports recibidos contienen 1.006 tarjetas. Se asociaron 227 cuerpos por título
-único y se importaron cinco imágenes; 779 tarjetas indican que el cuerpo no estaba
-disponible. Los originales se conservan sin modificaciones en Downloads. Dependencias,
-relaciones y cálculos de otras bases se omiten. Fechas originales se conservan como
-texto para no inventar una zona horaria. Eduardo Esquivel no se crea como usuario.
-
 ## Colaboración y eventos
 
-El cuerpo se sincroniza mediante Yjs. `document.apply` acepta una actualización Yjs
+El cuerpo se sincroniza mediante Yjs. `cards applyDocument` acepta una actualización Yjs
 en base64 y devuelve tanto el estado colaborativo como el Markdown actual. Las
 actualizaciones concurrentes se combinan; modificar propiedades usa una versión y
-rechaza cambios obsoletos con `CONFLICT`.
+rechaza cambios obsoletos con `STALE_VERSION` (kind `CONFLICT`).
 
-Cada acción completada persiste un evento en la misma transacción. SSE informa cambios
-confirmados y recupera eventos al reconectar. Las lecturas también se auditan, pero no
-provocan nuevas recargas. El historial muestra persona y agente.
+Cada endpoint emite su evento en la misma transacción; los eventos están en el
+`events.ts` de cada dominio y `catalog read` lista sus nombres y payloads. No se guarda
+historial: los eventos salen por webhook y, si cambian el tablero, por SSE, que al
+reconectar recarga todo. Cada evento indica persona y agente.
 
-Los webhooks usan un outbox durable, hasta 10 intentos con espera exponencial. Verifica
-`X-Sloption-Signature` como HMAC-SHA256 de `timestamp + "." + rawBody`, usando el secreto
-del webhook y `X-Sloption-Timestamp`. Deduplica por `X-Sloption-Event-Id`; la entrega es
-al menos una vez. Los intentos y errores quedan en la tabla `deliveries`.
+Los webhooks se entregan después del commit, con hasta 10 intentos y espera
+exponencial. Verifica `X-Sloption-Signature` como HMAC-SHA256 de
+`timestamp + "." + rawBody`, usando el secreto del webhook y `X-Sloption-Timestamp`.
+Deduplica por `X-Sloption-Event-Id`. La entrega vive en memoria: si el servidor se
+reinicia, lo pendiente se pierde.
 
 ## Verificación
 

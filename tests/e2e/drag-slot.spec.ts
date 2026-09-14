@@ -4,9 +4,9 @@ import { readdirSync, readFileSync } from "node:fs";
 // Cada componente trae su propia hoja: se cargan todas para que la prueba siga
 // midiendo las reglas reales aunque una regla cambie de archivo.
 function allStyles() {
-  return readdirSync("src/web", { recursive: true, encoding: "utf8" })
+  return readdirSync("src/frontend", { recursive: true, encoding: "utf8" })
     .filter((file) => file.endsWith(".css"))
-    .map((file) => readFileSync(`src/web/${file}`, "utf8"))
+    .map((file) => readFileSync(`src/frontend/${file}`, "utf8"))
     .join("\n");
 }
 

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { reorderStages } from "@/web/lib/stages";
+import { reorderStages } from "@/frontend/lib/stages";
 
 const stages = [
   { id: "a", label: "A" },
