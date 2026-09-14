@@ -1,10 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { createIdentityService } from "../src/backend/core/identity";
-import type { Collection, Entities } from "../src/backend/core/model";
-import type { Transaction } from "../src/backend/core/ports";
+import { createAuthenticator } from "../src/backend/domains/auth/authenticator";
+import type { Collection, Entities, Tx } from "../src/backend/domains/kernel";
 
-/** Misma tienda en memoria que `archive.test.ts`: sin base ni servidor. */
-function identity() {
+/** Tienda en memoria: sin base ni servidor. */
+function authenticator() {
   const store = new Map<string, unknown>();
   const tx = {
     async get(collection: string, id: string) {
@@ -15,18 +14,7 @@ function identity() {
         .filter(([key]) => key.startsWith(`${collection}/`))
         .map(([, value]) => value) as never;
     },
-    async put(collection: string, entity: { id: string }) {
-      store.set(`${collection}/${entity.id}`, entity);
-    },
-    async remove() {},
-    async appendEvent() {},
-    async createAccount() {
-      return "";
-    },
-    async history() {
-      return [];
-    },
-  } as unknown as Transaction;
+  } as unknown as Tx;
   const put = <K extends Collection>(collection: K, entity: Entities[K]) =>
     store.set(`${collection}/${entity.id}`, entity);
   put("profiles", {
@@ -61,20 +49,23 @@ function identity() {
     digest: "digest-revocado",
     revoked: true,
   });
-  return createIdentityService({
-    store: { transaction: (operation) => operation(tx) },
+  return createAuthenticator({
+    unitOfWork: { transaction: (operation) => operation(tx) },
     // El token es su propio digest: alcanza para distinguir cuál se presentó.
-    secrets: { create: () => "s", digest: (value) => value },
-    newId: () => "11111111-1111-4111-8111-111111111111",
-    now: () => new Date("2026-09-08T12:00:00Z"),
+    secrets: { digest: (value) => value },
+    // La cookie es el id de BetterAuth: el adaptador real le pregunta a BetterAuth.
+    sessionUserId: async (cookie) => cookie || null,
   });
 }
 
+const apiKey = (token: string) => ({ kind: "apiKey" as const, token });
+const session = (cookie: string) => ({ kind: "session" as const, cookie });
+
 describe("quién es el que llama", () => {
   test("una API key actúa como su dueño y anota al agente", async () => {
-    const actor = await identity().fromApiKey("digest-vigente");
-    expect(actor).toEqual({
+    expect(await authenticator().resolve(apiKey("digest-vigente"))).toEqual({
       userId: "ana",
+      orgId: "main",
       role: "admin",
       agentId: "bot",
       apiKeyId: "k1",
@@ -82,17 +73,17 @@ describe("quién es el que llama", () => {
   });
 
   test("una key revocada no autentica", async () => {
-    expect(await identity().fromApiKey("digest-revocado")).toBeNull();
+    expect(await authenticator().resolve(apiKey("digest-revocado"))).toBeNull();
   });
 
   test("una key inexistente no autentica", async () => {
-    expect(await identity().fromApiKey("cualquier-cosa")).toBeNull();
+    expect(await authenticator().resolve(apiKey("cualquier-cosa"))).toBeNull();
   });
 
   test("la sesión resuelve al perfil, y el rol sale de ahí", async () => {
-    const actor = await identity().fromSession("auth-ana");
-    expect(actor).toEqual({
+    expect(await authenticator().resolve(session("auth-ana"))).toEqual({
       userId: "ana",
+      orgId: "main",
       role: "admin",
       agentId: null,
       apiKeyId: null,
@@ -100,10 +91,11 @@ describe("quién es el que llama", () => {
   });
 
   test("un usuario de auth sin perfil no autentica", async () => {
-    expect(await identity().fromSession("auth-fantasma")).toBeNull();
+    expect(await authenticator().resolve(session("auth-fantasma"))).toBeNull();
   });
 
-  test("el perfil de un agente no se alcanza por sesión", async () => {
-    expect(await identity().fromSession("")).toBeNull();
+  test("sin credencial no hay actor", async () => {
+    expect(await authenticator().resolve(null)).toBeNull();
+    expect(await authenticator().resolve(session(""))).toBeNull();
   });
 });

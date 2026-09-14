@@ -6,7 +6,7 @@ import Image from "@tiptap/extension-image";
 import Collaboration from "@tiptap/extension-collaboration";
 import * as Y from "yjs";
 import { action, errorMessage, queryClient } from "@/frontend/lib/api";
-import type { Card } from "@/backend/core/model";
+import type { Card } from "@/backend/domains/kernel";
 import { FilePicker } from "@/frontend/ui";
 
 const decode = (value: string) =>
@@ -63,7 +63,7 @@ export default function DocumentEditor({
       dirty = false;
       setPending(true);
       try {
-        const result = await action<Card>("document.apply", {
+        const result = await action<Card>("cards.applyDocument", {
           id: card.id,
           update: encode(Y.encodeStateAsUpdate(doc)),
         });
@@ -114,7 +114,7 @@ export default function DocumentEditor({
   async function upload(file: File) {
     try {
       const buffer = new Uint8Array(await file.arrayBuffer());
-      const result = await action<{ url: string }>("asset.create", {
+      const result = await action<{ url: string }>("assets.create", {
         name: file.name,
         mime: file.type,
         content: encode(buffer),

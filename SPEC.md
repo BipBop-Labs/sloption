@@ -33,7 +33,7 @@ Consecuencias:
 - Toda acción es nombrable y parametrizable: nombre estable, input tipado, output
   tipado, errores explícitos.
 - Una persona y un agente se autentican distinto pero **autorizan igual**: mismos
-  permisos, mismas reglas, misma auditoría.
+  permisos, mismas reglas, mismos eventos.
 
 **Test de aceptación:** tomar cualquier flujo de la UI y reproducirlo completo desde
 la CLI, sin navegador. Si no se puede, falta acción.
@@ -46,7 +46,7 @@ Toda operación del sistema es una acción. Una acción:
 2. Es invocable desde la UI, desde la API HTTP y desde la CLI — las tres llegan a la
    misma implementación.
 3. Autoriza igual sin importar por dónde entró.
-4. **Emite un evento** al completarse.
+4. **Declara su evento**, que emite al completarse, o declara explícitamente que no emite.
 
 El catálogo de acciones es a la vez la superficie de la UI y la de la API. Se define
 una vez.
@@ -56,7 +56,12 @@ una vez.
 Cada acción emite un evento con **esquema rígido y versionado**. Los eventos son el
 mecanismo por el cual nuestros agentes reaccionan a lo que pasa en el tablero.
 
-- Todos los eventos existen y están parametrizados, sin excepción.
+- Todos los eventos existen y están parametrizados. El payload lo define el dominio
+  con los datos que importan: `cards.move.v1` dice desde qué columna y hacia cuál.
+- **No hay historial.** Los eventos no se guardan: se consumen por webhook. Quien
+  necesite conservarlos suscribe un webhook a otro servicio.
+- Login y logout también emiten evento, con IP y dispositivo: una alerta de acceso es
+  un webhook suscrito a `auth.login.v1`.
 - **A qué eventos te suscribes es elección tuya.** No todo evento amerita un webhook
   — crear una categoría nueva no debería despertar a nadie, un cambio de estado o una
   asignación sí. Esa decisión vive en la suscripción, no en la emisión.
@@ -74,7 +79,7 @@ links, sin 2FA — pero bien configurado y prolijo, porque después crece.
 Sobre eso, dos piezas que sí son parte de v1:
 
 - **API keys.** Se crean desde tu propio usuario en la web. Con una API key, la CLI
-  actúa **como vos**: tus permisos, tu identidad en la auditoría.
+  actúa **como vos**: tus permisos, tu identidad en los eventos.
 - **Usuarios virtuales (agentes).** Un agente es un usuario más: se le asigna una
   tarjeta como a cualquiera, y esa asignación viaja por el webhook para que la lógica
   del otro lado la tome.
@@ -140,10 +145,11 @@ Esto mantiene el modelo chico y hace el tablero configurable sin código.
 - No hay edición masiva (reemplaza la expectativa anterior de completar en bloque).
 - Editor visual estilo Notion con imágenes. Tarjetas archivables y restaurables.
 - Cambios visibles en vivo y edición simultánea del cuerpo con Yjs.
-- Todas las operaciones emiten eventos; historial consultable. No existe contrato
-  previo de webhooks que haya que conservar.
+- Todas las operaciones declaran su evento. No existe contrato previo de webhooks que
+  haya que conservar. El historial consultable se retiró el 2026-09-13: guardar todo
+  era demasiada data para lo que se usaba; los eventos se consumen por webhook.
 - Cada usuario puede crear y revocar API keys para sus agentes, sin vencimiento ni
-  restricciones de permisos de la key. La auditoría identifica al agente y al dueño.
+  restricciones de permisos de la key. Los eventos identifican al agente y al dueño.
 - Importación de Notion incluida. Los documentos importados son datos, no instrucciones.
 - Todo el código se escribe en inglés; la interfaz, en español.
 - La marca semanal se mantiene hasta quitarla manualmente, sin reinicio por calendario.

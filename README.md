@@ -43,8 +43,8 @@ sus propias claves de agentes. Las invitaciones generan un enlace para compartir
 sin enviar correo. Se consumen una sola vez.
 
 Las identidades importadas no pueden iniciar sesión hasta vincularse con una invitación.
-Las claves no vencen, se pueden revocar y heredan el rol actual del dueño. La auditoría
-incluye el dueño, el agente y el ID de la clave, nunca su secreto.
+Las claves no vencen, se pueden revocar y heredan el rol actual del dueño. Los eventos
+incluyen el dueño, el agente y el ID de la clave, nunca su secreto.
 
 ## CLI y API
 
@@ -63,22 +63,23 @@ Si `~/.local/bin` no está en el PATH, elegí otro destino con
 ```sh
 export SLOPTION_URL=http://localhost:5173
 export SLOPTION_API_KEY=...
-sloption help
-sloption catalog.read '{}'
-sloption board.read '{"view":"week"}'
-sloption card.create '{"title":"Nueva tarea","weekly":true}'
-sloption card.read '{"id":"..."}'
-sloption card.move '{"id":"...","optionId":"cooking","beforeId":null}'
-sloption card.week '{"id":"...","weekly":false}'
-sloption profile.preferences '{"theme":"dark"}'
+sloption help                # con credenciales, lista todos los comandos
+sloption catalog read
+sloption boards read '{"view":"week"}'
+sloption cards create '{"title":"Nueva tarea","weekly":true}'
+sloption cards read '{"id":"..."}'
+sloption cards move '{"id":"...","optionId":"cooking","beforeId":null}'
+sloption cards week '{"id":"...","weekly":false}'
+sloption profiles preferences '{"theme":"dark"}'
 ```
 
-Cada acción se expone en `POST /api/actions/<nombre>`, con JSON y autenticación por
-cookie o `Authorization: Bearer ...`. `catalog.read` describe inputs, outputs y eventos.
-Un argumento `@archivo.json` permite enviar documentos largos desde CLI.
+Cada endpoint tiene su ruta, por defecto `POST /api/<base>/<nombre>` (`cards move` es
+`POST /api/cards/move`), con JSON y autenticación por cookie o `Authorization: Bearer ...`.
+`catalog read` describe inputs, outputs, errores y el payload de cada evento; la CLI saca
+las rutas de ahí. Un argumento `@archivo.json` permite enviar documentos largos desde CLI.
 
-`sloption auth.login @credenciales.json` devuelve la cookie; también se puede usar
-`SLOPTION_COOKIE` en lugar de una API key. `auth.logout` e `invitation.accept` están
+`sloption session login @credenciales.json` devuelve la cookie; también se puede usar
+`SLOPTION_COOKIE` en lugar de una API key. `session logout` e `invitations accept` están
 disponibles sin navegador. Si apuntas directamente al puerto aleatorio del backend,
 configura `SLOPTION_ORIGIN` con el `APP_URL` esperado.
 

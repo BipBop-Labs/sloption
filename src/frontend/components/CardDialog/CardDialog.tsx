@@ -1,6 +1,6 @@
 import "./CardDialog.css";
 import { lazy, Suspense, useState } from "react";
-import type { Card, Field, Profile, Value } from "@/backend/core/model";
+import type { Card, Field, Profile, Value } from "@/backend/domains/kernel";
 import type { Update } from "@/frontend/lib/update";
 import {
   Chip,
@@ -128,7 +128,7 @@ export function CardDialog({
           onChange={(event) => setTitle(event.target.value)}
           onBlur={() => {
             if (title !== card.title)
-              void update("card.update", {
+              void update("cards.update", {
                 id: card.id,
                 version: card.version,
                 title,
@@ -149,7 +149,7 @@ export function CardDialog({
             )
               return;
             void update(
-              "card.archive",
+              "cards.archive",
               { id: card.id, archived: archiving },
               { archived: archiving },
             );
@@ -170,7 +170,7 @@ export function CardDialog({
             // si la acción falla lo devuelve sola. No hace falta copiarlo acá.
             const next = !card.weekly;
             void update(
-              "card.week",
+              "cards.week",
               { id: card.id, weekly: next },
               { weekly: next },
             );
@@ -195,7 +195,7 @@ export function CardDialog({
             current={card.values[field.id]}
             profiles={profiles}
             save={(value) => {
-              void update("card.update", {
+              void update("cards.update", {
                 id: card.id,
                 version: card.version,
                 values: { [field.id]: value },

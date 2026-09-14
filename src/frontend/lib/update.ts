@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { Card, Value } from "@/backend/core/model";
+import type { Card, Value } from "@/backend/domains/kernel";
 import {
   action,
   queryClient,
@@ -32,7 +32,7 @@ export function useUpdate(showError: (message: string) => void): Update {
         queryKey: ["board"],
       });
       const previousCard = queryClient.getQueryData<Card>(["card", input.id]);
-      if (name === "card.update") {
+      if (name === "cards.update") {
         const current =
           previousCard ??
           caches
@@ -47,7 +47,7 @@ export function useUpdate(showError: (message: string) => void): Update {
             },
           };
       }
-      if (name === "card.move") {
+      if (name === "cards.move") {
         const data = caches.find(([, data]) =>
           data?.cards.some((card) => card.id === input.id),
         )?.[1];

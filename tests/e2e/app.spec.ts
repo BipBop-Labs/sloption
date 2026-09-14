@@ -24,8 +24,12 @@ test("board, collaborative editor, settings and mobile", async ({
   await expect(
     page.getByRole("heading", { name: "Esta semana", exact: true }),
   ).toBeVisible();
+  // No depende de datos previos: la base de desarrollo puede estar vacía.
+  await page.request.post("/api/cards/create", {
+    data: { title: `E2E semana ${Date.now()}`, weekly: true },
+  });
   await expect(page.locator(".card").first()).toBeVisible();
-  await page.request.post("/api/actions/profile.preferences", {
+  await page.request.post("/api/profiles/preferences", {
     data: { theme: "light" },
   });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
@@ -45,7 +49,8 @@ test("board, collaborative editor, settings and mobile", async ({
     exact: true,
   });
   await expect(tile).toBeVisible();
-  await tile.press("Enter");
+  // Crear desde el composer ya abre el drawer. Un Enter sobre la tarjeta mueve el
+  // foco fuera del panel mientras abre, y a veces lo cierra.
   await expect(page.getByRole("dialog")).toBeVisible();
   // El drawer entra deslizando: se mide cuando la animación terminó, no en el
   // primer frame, donde todavía está fuera de la pantalla. Se compara contra
@@ -95,6 +100,11 @@ test("board, collaborative editor, settings and mobile", async ({
   await expect(editor).toContainText("desde otro cliente", { timeout: 20000 });
   await page.getByRole("button", { name: "Esta semana", exact: true }).click();
   await page.getByRole("button", { name: "Archivar", exact: true }).click();
+  // Archivar pide confirmación desde 120c86d; el test nunca la aceptaba.
+  await page
+    .getByRole("dialog", { name: "¿Archivar esta tarjeta?" })
+    .getByRole("button", { name: "Archivar", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Restaurar", exact: true }),
   ).toBeVisible();

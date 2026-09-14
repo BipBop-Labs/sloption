@@ -1,24 +1,22 @@
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import type { ActionEvent, UnitOfWork } from "../../core/actions";
-import type { Collection, Entities, Webhook } from "../../core/model";
-import type { Transaction } from "../../core/ports";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import type { Collection, Entities, Tx } from "../../domains/kernel";
+import type { UnitOfWork } from "../../lib/ports";
 import { authConfiguration } from "../../server/auth-options";
 import * as schema from "./schema";
-import { records, events, deliveries } from "./schema";
+import { deliveries, records } from "./schema";
 
-export function createStore(pool: Pool): UnitOfWork<Transaction> {
+export function createStore(pool: Pool): UnitOfWork<Tx> {
   const db = drizzle(pool);
   return {
     transaction: (operation) =>
       db.transaction(async (dbtx) => {
-        // A shared board has one write order, including events and collaborative updates.
-        // Reads use the same short lock so SSE cursors cannot miss late-committing events.
+        // A shared board has one write order, including collaborative updates.
         await dbtx.execute(sql`select pg_advisory_xact_lock(71924001)`);
-        const transaction: Transaction = {
+        const transaction: Tx = {
           async createAccount(email, password, name) {
             const accountService = betterAuth({
               ...authConfiguration,
@@ -61,49 +59,13 @@ export function createStore(pool: Pool): UnitOfWork<Transaction> {
                 and(eq(records.collection, collection), eq(records.id, id)),
               );
           },
-          async history(before, limit, includeReads) {
-            const rows = await dbtx
-              .select()
-              .from(events)
-              .where(
-                and(
-                  before ? lt(events.sequence, before) : undefined,
-                  // Una lectura es una acción que se llama `.read` o `.list`:
-                  // es la convención de todo el catálogo. No se filtra por
-                  // `changed`, que dice si el tablero debe refrescarse — con eso
-                  // se escondían `key.revoke` y los cambios de webhook, que son
-                  // justo lo que una auditoría necesita ver. Los eventos de
-                  // sesión (`auth.*`, `stream.open`) tampoco son lecturas.
-                  includeReads
-                    ? undefined
-                    : sql`${events.payload}->>'type' !~ '\\.(read|list)\\.v[0-9]+$'`,
-                ),
-              )
-              .orderBy(desc(events.sequence))
-              .limit(limit);
-            return rows.map((row) => ({
-              ...row.payload,
-              sequence: row.sequence,
-            }));
+          async enqueueDelivery(webhookId, event) {
+            await dbtx
+              .insert(deliveries)
+              .values({ id: `${event.id}:${webhookId}`, webhookId, payload: event });
           },
-          async appendEvent(event: ActionEvent) {
-            const [stored] = await dbtx
-              .insert(events)
-              .values({ payload: event })
-              .returning();
-            if (!stored) throw new Error("Event insert failed");
-            const hooks = await transaction.list("webhooks");
-            for (const hook of hooks)
-              if (hook.enabled && hook.events.includes(event.type)) {
-                await dbtx.insert(deliveries).values({
-                  id: `${stored.sequence}:${hook.id}`,
-                  eventSequence: stored.sequence,
-                  webhookId: hook.id,
-                });
-              }
-            await dbtx.execute(
-              sql`select pg_notify('sloption_events', ${String(stored.sequence)})`,
-            );
+          async notify(type) {
+            await dbtx.execute(sql`select pg_notify('sloption_events', ${type})`);
           },
         };
         return operation(transaction);

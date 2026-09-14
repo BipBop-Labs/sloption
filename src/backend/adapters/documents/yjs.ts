@@ -4,7 +4,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import { MarkdownManager } from "@tiptap/markdown";
 import { prosemirrorJSONToYDoc, yDocToProsemirrorJSON } from "y-prosemirror";
-import type { Documents } from "../../core/ports";
+import type { Documents } from "../../lib/ports";
 
 const extensions = [StarterKit, Image];
 const schema = getSchema(extensions);

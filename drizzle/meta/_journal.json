@@ -15,6 +15,13 @@
       "when": 1788882944712,
       "tag": "0001_chubby_retro_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789344584686,
+      "tag": "0002_drop_event_history",
+      "breakpoints": true
     }
   ]
 }

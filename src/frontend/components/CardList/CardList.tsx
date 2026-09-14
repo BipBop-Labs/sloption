@@ -1,5 +1,5 @@
 import "./CardList.css";
-import type { Card, Field, Profile } from "@/backend/core/model";
+import type { Card, Field, Profile } from "@/backend/domains/kernel";
 import { cardQuery, queryClient } from "@/frontend/lib/api";
 import { Avatars, Chip, chipColor, Composer } from "@/frontend/ui";
 

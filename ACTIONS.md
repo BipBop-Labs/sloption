@@ -1,25 +1,29 @@
 # Action catalog v1
 
-All authenticated actions use the same core dispatcher from HTTP, web, and CLI.
-Each success emits `<action>.v1` with a strict action-specific payload; failures do
-not emit a success event. Events never include passwords, invitation tokens or API keys.
+The source of truth is `catalog.read` (`sloption catalog read`): every endpoint with its
+doc, input/output JSON Schema, access, declared errors and event payload schema. This
+file is only a map.
 
-| Actions | Access | Purpose |
+Each endpoint lives in `src/backend/domains/<domain>/router.ts`. Action `cards.move`
+is `POST /api/cards/move`, CLI `sloption cards move`, event `cards.move.v1`. Failures do
+not emit an event. Events never include passwords, invitation tokens or API keys, and
+they are not stored: webhooks consume them.
+
+| Endpoints | Access | Purpose |
 |---|---|---|
-| board.read, board.configure | member / admin | Read board; change shared grouping |
-| card.read, card.create, card.update, card.move, card.archive, card.week | member | Card lifecycle and ordering |
-| document.apply | member | Merge a collaborative document update |
-| field.create, field.update, field.remove | admin | Shared property schema and option ordering |
-| profile.list, profile.preferences | member | Assignable identities and persisted theme |
-| profile.update, invitation.create | admin | Roles and invitations |
-| key.list, key.create, key.revoke | owner | Agent credentials |
-| webhook.list, webhook.create, webhook.update, webhook.remove | admin | Event subscriptions |
-| history.list | member | Durable audit history |
-| asset.create, asset.read | member | Embedded images |
-| import.apply | admin | Idempotent Notion import |
+| boards.read, boards.configure | member / admin | Read board; change shared grouping |
+| cards.read, cards.create, cards.update, cards.move, cards.archive, cards.week | member | Card lifecycle and ordering |
+| cards.applyDocument | member | Merge a collaborative document update |
+| fields.create, fields.update, fields.remove | admin | Shared property schema and option ordering |
+| profiles.list, profiles.preferences | member | Assignable identities and persisted theme |
+| profiles.update, invitations.create | admin | Roles and invitations |
+| invitations.accept | public | Redeem an invitation |
+| keys.list, keys.create, keys.revoke | member, owner for revoke | Agent credentials |
+| webhooks.list, webhooks.create, webhooks.update, webhooks.remove | admin | Event subscriptions |
+| assets.create, assets.read | member | Embedded images; read is `GET /api/assets/:id` |
+| imports.apply | admin | Idempotent Notion import |
+| session.me | member | Who is calling; no event |
+| catalog.read | member | This catalog |
 
-Authentication emits auth.login.v1, auth.logout.v1 and auth.session.v1. Invitation
-acceptance emits invitation.accept.v1, provisioning system.seed.v1, and opening the
-stream emits stream.open.v1. Authentication uses BetterAuth endpoints; invitation
-acceptance and its account/profile transaction live in the core identity service.
-The CLI exposes auth.login, auth.logout and invitation.accept as named operations.
+Sign-in and sign-out go through BetterAuth (`/api/auth/*`, CLI `session login` and
+`session logout`) and emit `auth.login.v1` and `auth.logout.v1` with IP and user agent.

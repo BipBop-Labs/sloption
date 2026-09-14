@@ -61,18 +61,6 @@ if (!existing) {
       type: "people",
       options: [],
     });
-    await tx.appendEvent({
-      id: randomUUID(),
-      type: "system.seed.v1",
-      actor: {
-        userId: profile.id,
-        role: "admin",
-        agentId: null,
-        apiKeyId: null,
-      },
-      occurredAt: new Date().toISOString(),
-      data: { profileId: profile.id },
-    });
   });
 }
 await pool.end();

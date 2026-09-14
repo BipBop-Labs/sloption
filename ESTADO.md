@@ -1,21 +1,24 @@
 # Estado
 
-**Última actualización:** 2026-09-08
+**Última actualización:** 2026-09-13
 **Fase:** v1 implementada y validada localmente. No desplegada.
 
 ## Implementado
 
-- Arquitectura hexagonal documentada en CODE.md; TanStack Router/Query + Hono.
+- Arquitectura hexagonal cortada por dominio (router, orquestador, servicios),
+  documentada en CODE.md; TanStack Router/Query + Hono.
 - PostgreSQL y Drizzle, migraciones y seed transaccional de administrador.
 - Kanban, orden manual, marca semanal manual, archivo y restauración.
 - Propiedades tipadas configurables; selección simple y múltiple mediante dropdowns.
 - Editor visual Tiptap con imágenes, colaboración Yjs y Markdown persistido.
-- Acciones comunes por HTTP y CLI, autorización de admins/miembros y auditoría.
+- Endpoints comunes por HTTP y CLI, autorización de admins/miembros; cada uno declara
+  su evento con payload propio.
 - Invitaciones de un uso sin email, vinculación de identidades importadas.
-- Agentes con API keys revocables, sin vencimiento; auditoría del agente y su dueño.
-- Webhooks con firma HMAC, outbox durable y reintentos.
-- Historial de eventos en su propia vista (`/?view=history`): tabla paginada por
-  cursor. Sincronización SSE con recuperación por cursor.
+- Agentes con API keys revocables, sin vencimiento; los eventos identifican al agente y
+  a su dueño.
+- Webhooks con firma HMAC, outbox durable y reintentos. Son la única salida de los
+  eventos: no hay historial. Login y logout emiten evento con IP y dispositivo.
+- Sincronización SSE: aviso de cambio y recarga completa al reconectar.
 - Drawer lateral, chips, apariencia similar a shadcn y tokens claro/oscuro.
   Tema persistido por usuario mediante acción. Esta indicación reemplazó Dell.
 - Hover de tarjeta con borde `--info`; al arrastrar, la tarjeta sale del flujo y
@@ -59,9 +62,10 @@ Después del refactor a dominios (plan del 2026-09-13):
 3. **Una persona en varias organizaciones.** Es lo más difícil y puede que no se haga
    nunca. La alternativa es un deploy completo de la app por organización.
 
-Lo que deja listo el refactor: `orgId` en el actor, el puerto `Authorizer.can(actor,
-boardId)`, `scope` en los endpoints (el runner carga el recurso, autoriza y lo
-inyecta) y listas filtradas por un servicio de auth.
+Lo que deja listo el refactor: `orgId` en el actor y `scope` en los endpoints (el
+runner carga el recurso, autoriza y se lo pasa al orquestador). El puerto
+`Authorizer.can(actor, boardId)` y las listas filtradas por acceso se agregan con las
+organizaciones: hoy no tendrían nada que decidir.
 
 ## Datos locales
 
@@ -96,11 +100,63 @@ README.md explica arranque, importación, CLI y configuración para Coolify.
 
 ## Próximo paso
 
-Usar la app y recoger ajustes del equipo. Mantener paridad UI/API/CLI en cada cambio.
+Decidir qué hacer con los datos locales: reimportar Notion en el volumen nuevo o
+recuperar `backoffice_postgres-dev`. Recrear los webhooks con los nombres de evento
+nuevos. Después, usar la app y recoger ajustes del equipo.
 
 ## Bitácora
 
 Formato: fecha — qué cambió. Agregá arriba, no abajo.
+
+### 2026-09-13 — Backend por dominios, eventos a webhooks, sin historial
+
+- **`src/frontend/` y `src/backend/`.** El frontend no cambió por dentro.
+- **Wrapper en `src/backend/lib/`.** `defineRouter` + `defineEndpoint` declaran cada
+  endpoint una vez; de ahí salen la acción, la ruta HTTP, el comando CLI, el evento y la
+  entrada del catálogo. `createCatalog` es el runner. `service.ts` (827 líneas) se partió
+  en siete dominios con `router.ts`, `orchestrator.ts` y `services.ts`.
+  `tests/architecture.test.ts` verifica que los orquestadores no se importan entre sí y
+  que `lib/` no conoce dominios.
+- **auth es un dominio** e implementa el puerto `Authenticator`. Permisos por recurso con
+  `scope`: el runner carga, autoriza e inyecta (hoy: `keys revoke` solo del dueño, y
+  NOT_FOUND de toda operación sobre una tarjeta).
+- **Errores por dominio**, con código propio y `kind` genérico: `{error:{code,kind,message}}`.
+- **Eventos con payload propio** (`cards.move.v1` trae `fromOptionId` y `toOptionId`), en
+  `.v1` porque estamos en beta. `session.me` declara `event: null`.
+- **Sin historial.** Migración `0002`: se borra la tabla `events` y `deliveries` guarda
+  el payload; lo entregado se borra. Se fueron la vista de historial, `history.list`, el
+  cursor SSE y `wake-signal.ts`.
+- **Sesión:** `auth.login.v1` y `auth.logout.v1` con IP (último valor de
+  `X-Forwarded-For`) y user agent. Se eliminaron `auth.session.v1`, `stream.open.v1`,
+  `invitation.accept` como ruta a mano y `system.seed.v1`. Login y logout siguen en
+  BetterAuth, fuera del catálogo, por su rate limit y la cookie HttpOnly.
+- **Nombres nuevos, sin compatibilidad:** `card.*` → `cards.*`, `document.apply` →
+  `cards.applyDocument`, `key.*` → `keys.*`, etc. `POST /api/actions/:name` ya no existe.
+  La CLI acepta `sloption cards move` y `sloption cards.move`, y saca las rutas de
+  `catalog.read`. Los webhooks suscritos a nombres viejos dejan de recibir.
+
+Verificación: typecheck, build, 39 tests unitarios (runner, scope, errores, auth,
+archivo, arquitectura) y un smoke que monta las 29 rutas. Migración `0002` aplicada por
+el backend de Docker al arrancar. E2E: `api.spec` 2/2, `app.spec` 3/3 repetido y
+`drag-slot.spec` 2/2.
+
+Arreglos en los E2E, ninguno por el refactor:
+
+- `app.spec` suponía tarjetas semanales en la base; ahora crea la suya.
+- `app.spec` no aceptaba la confirmación de archivar, que existe desde `120c86d`.
+- `app.spec` apretaba Enter sobre la tarjeta recién creada, pero el composer ya abre el
+  drawer y el Enter a veces lo cerraba. Fallaba en un paso distinto cada corrida.
+- `api.spec` buscaba la red `backoffice_default`. Con Docker Desktop el gateway de la
+  red queda dentro de la VM: el receptor del webhook se alcanza por
+  `host.docker.internal`.
+
+Entorno:
+
+- Al renombrar la carpeta a `sloption`, compose pasó a ser otro proyecto con otro
+  volumen, `sloption_postgres-dev`, que arrancó vacío. Las 1006 tarjetas importadas
+  siguen en `backoffice_postgres-dev`.
+- El login de BetterAuth permite 10 intentos por minuto. Correr E2E seguidos lo agota y
+  el test falla en el login con "Demasiados intentos".
 
 ### 2026-09-08 — Revisión Ousterhout del backend: identidad, límites y auditoría
 

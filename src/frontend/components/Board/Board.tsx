@@ -1,6 +1,6 @@
 import "./Board.css";
 import React, { useRef, useState } from "react";
-import type { Card } from "@/backend/core/model";
+import type { Card } from "@/backend/domains/kernel";
 import {
   action,
   errorMessage,
@@ -55,7 +55,7 @@ export function Board({
         },
     );
     try {
-      await action("field.update", {
+      await action("fields.update", {
         id: grouping.id,
         name: grouping.name,
         options,
@@ -305,7 +305,7 @@ export function Board({
                 submitLabel={`Crear tarjeta en ${option.label}`}
                 onSubmit={async (title) => {
                   try {
-                    const created = await action<Card>("card.create", {
+                    const created = await action<Card>("cards.create", {
                       title,
                       values: { [data.board.groupingId]: option.id || null },
                       weekly: true,

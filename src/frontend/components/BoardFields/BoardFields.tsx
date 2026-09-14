@@ -2,7 +2,7 @@ import "./BoardFields.css";
 import { useState } from "react";
 import { action, errorMessage, refresh, type BoardData } from "@/frontend/lib/api";
 import { Button, DropdownSelect, Modal, SettingRow } from "@/frontend/ui";
-import type { Field } from "@/backend/core/model";
+import type { Field } from "@/backend/domains/kernel";
 
 /** Las propiedades y las columnas son la forma del tablero, no una preferencia
  *  de la cuenta: se editan desde el tablero mismo. Solo las ve quien administra
@@ -49,7 +49,7 @@ export default function BoardFields({
             label="Agrupar tablero por"
             value={board?.board.groupingId}
             onChange={(value) => {
-              void perform("board.configure", { groupingId: value });
+              void perform("boards.configure", { groupingId: value });
             }}
             options={
               board?.fields
@@ -64,7 +64,7 @@ export default function BoardFields({
             const form = event.currentTarget;
             const data = new FormData(form);
             if (
-              await perform("field.create", {
+              await perform("fields.create", {
                 name: data.get("name"),
                 type: data.get("type"),
                 options: [],
@@ -197,7 +197,7 @@ function FieldSettings({
       </p>
       <button
         onClick={() => {
-          void perform("field.update", { id: field.id, name, options });
+          void perform("fields.update", { id: field.id, name, options });
         }}
       >
         Guardar propiedad
@@ -206,7 +206,7 @@ function FieldSettings({
         disabled={grouping === field.id}
         variant="danger"
         onClick={() => {
-          void perform("field.remove", { id: field.id });
+          void perform("fields.remove", { id: field.id });
         }}
       >
         Eliminar propiedad

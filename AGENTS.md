@@ -30,13 +30,15 @@ los tres contiene lógica de negocio.
 Test de aceptación, de [SPEC.md](SPEC.md): tomar cualquier flujo de la UI y reproducirlo
 completo desde la CLI, sin navegador. Si no se puede, falta una acción.
 
-### 2. Toda operación es una acción, y toda acción emite un evento
+### 2. Toda operación es un endpoint, y todo endpoint declara su evento
 
 Nombre estable, input tipado, output tipado, errores explícitos. Invocable desde los
 tres adaptadores. Autoriza igual sin importar por dónde entró. Emite un evento de
-esquema rígido y versionado al completarse.
+esquema rígido y versionado al completarse, con un payload que define su dominio, o
+declara `event: null`.
 
-Si agregás una operación y no le ponés nombre de acción ni evento, está incompleta.
+Si agregás una operación sin su definición en un `router.ts`, está incompleta. No hay
+historial: los eventos se consumen por webhook.
 
 ### 3. No hay estado solo-frontend
 
@@ -57,35 +59,47 @@ Un estándar reconocible da un criterio externo contra el cual medir cada decisi
 
 Mientras esto esté abierto, **no se escribe código de features.**
 
-### 5. El frontend tiene cuatro capas y no se mezclan
+### 5. El backend se corta por dominio
 
-- `src/web/routes/` — **las páginas.** Una página es lo que el router monta y lo que la
+Cada dominio de `src/backend/domains/` tiene `router.ts` (solo definiciones y doc),
+`orchestrator.ts` (una función por endpoint) y `services.ts` (lo reutilizable).
+
+- Un orquestador usa servicios, propios o de otro dominio. **Nunca otro orquestador.**
+- Los servicios son lo único que se comparte entre dominios.
+- `src/backend/lib/` no importa dominios: los usa por puertos.
+
+`tests/architecture.test.ts` falla si se rompe alguna. Detalle en [CODE.md](CODE.md).
+
+### 6. El frontend tiene cuatro capas y no se mezclan
+
+- `src/frontend/routes/` — **las páginas.** Una página es lo que el router monta y lo que la
   URL nombra. `router.tsx` es el árbol de rutas; hoy hay una sola, `BoardPage`.
-- `src/web/components/` — **componentes con lógica.** Conocen el dominio, invocan
+- `src/frontend/components/` — **componentes con lógica.** Conocen el dominio, invocan
   acciones y consumen `ui/`. Los paneles que abre un parámetro de búsqueda —la tarjeta,
   configuración, propiedades— son componentes, no páginas: no tienen ruta propia.
-- `src/web/ui/` — **primitivas tontas.** No conocen el dominio: sin `Card`, sin `Field`,
+- `src/frontend/ui/` — **primitivas tontas.** No conocen el dominio: sin `Card`, sin `Field`,
   sin acciones, sin queries. Reciben props y avisan por callback.
-- `src/web/lib/` — lógica de vista que no es un componente: `api.ts`, `update.ts`,
+- `src/frontend/lib/` — lógica de vista que no es un componente: `api.ts`, `update.ts`,
   `filters.ts`, `drag.ts`, `stages.ts`. `main.tsx` es solo el entry y los proveedores.
 
 **Un directorio por componente, con su CSS al lado**: `Board/Board.tsx` +
-`Board/Board.css`, y el `.tsx` importa su `.css`. En la raíz de `src/web/` solo quedan
+`Board/Board.css`, y el `.tsx` importa su `.css`. En la raíz de `src/frontend/` solo quedan
 `main.tsx` y `styles.css`, y `styles.css` es solo lo global: tokens, estilo base de los
 elementos y las pocas clases que comparten pantallas que no se conocen entre sí.
 
 Antes de escribir un botón, un chip o un selector, mirá si ya está en `ui/` y reusalo. Si
 falta, va ahí y se exporta desde su `index.ts` — no suelto en un componente ni en la raíz
-de `src/web/`.
+de `src/frontend/`.
 
-**Los imports que cruzan de capa usan el alias `@/`** (`@/core/model`, `@/web/lib/api`,
-`@/web/ui`); dentro de la misma capa, ruta relativa. Así no aparecen `../../../`.
+**Los imports que cruzan de capa usan el alias `@/`** (`@/backend/domains/kernel`,
+`@/frontend/lib/api`, `@/frontend/ui`); dentro de la misma capa, ruta relativa. Así no
+aparecen `../../../`.
 
 Corolario de la regla 3: un componente **no copia a un `useState` algo que ya está en el
 caché de queries.** La predicción optimista ya dejó ahí el valor nuevo. Detalle en
 [CODE.md](CODE.md).
 
-### 6. `pnpm` siempre, nunca `npm`
+### 7. `pnpm` siempre, nunca `npm`
 
 ## Stack
 

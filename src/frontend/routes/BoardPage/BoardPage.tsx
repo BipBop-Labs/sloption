@@ -9,8 +9,8 @@ import {
 } from "react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import type { Actor } from "@/backend/core/actions";
-import type { Card } from "@/backend/core/model";
+import type { Actor } from "@/backend/lib/endpoint";
+import type { Card } from "@/backend/domains/kernel";
 import {
   action,
   boardQuery,
@@ -33,7 +33,6 @@ import { Board } from "@/frontend/components/Board/Board";
 import { CardDialog } from "@/frontend/components/CardDialog/CardDialog";
 import { CardList } from "@/frontend/components/CardList/CardList";
 import { Filters } from "@/frontend/components/Filters/Filters";
-import { History } from "@/frontend/components/History/History";
 import { Login } from "@/frontend/components/Login/Login";
 const Settings = lazy(() => import("@/frontend/components/Settings/Settings"));
 const BoardFields = lazy(
@@ -59,10 +58,6 @@ const VIEWS: Record<string, { title: string; hint: string }> = {
     hint: "El trabajo del equipo, en un lugar.",
   },
   archived: { title: "Archivo", hint: "Lo que ya salió del tablero." },
-  history: {
-    title: "Historial",
-    hint: "Todo lo que pasó, de lo más reciente a lo más viejo.",
-  },
 };
 
 function transition(work: () => void) {
@@ -77,7 +72,7 @@ function transition(work: () => void) {
 export function BoardPage() {
   const search = route.useSearch();
   const view = search.view ?? "week";
-  /** El historial no es una vista de tarjetas: no lleva pestañas ni filtros. */
+  /** El archivo es una lista aparte: no lleva pestañas ni propiedades. */
   const isBoard = view === "week" || view === "all";
   const navigate = useNavigate();
   const [toast, setToast] = useState("");
@@ -87,11 +82,11 @@ export function BoardPage() {
   const showError = useCallback((message: string) => setToast(message), []);
   const me = useQuery({
     queryKey: ["me"],
-    queryFn: () => request<Actor>("/api/me"),
+    queryFn: () => request<Actor>("/api/session/me"),
     retry: false,
   });
   const board = useQuery({
-    ...boardQuery(view === "history" ? "all" : view),
+    ...boardQuery(view),
     enabled: !!me.data,
   });
   // El tema sale del perfil, no de un estado aparte: mientras la acción viaja,
@@ -119,7 +114,7 @@ export function BoardPage() {
           ),
         });
     try {
-      await action("profile.preferences", { theme: next });
+      await action("profiles.preferences", { theme: next });
       refresh();
     } catch (error) {
       for (const [key, data] of caches) queryClient.setQueryData(key, data);
@@ -174,7 +169,7 @@ export function BoardPage() {
   const create = useCallback(
     async (title: string, weekly: boolean) => {
       try {
-        const created = await action<Card>("card.create", { title, weekly });
+        const created = await action<Card>("cards.create", { title, weekly });
         refresh();
         // Crear es el principio de escribir la tarjeta, no el final.
         open(created.id);
@@ -211,7 +206,6 @@ export function BoardPage() {
       <AppSidebar
         open={nav}
         onOpenChange={setNav}
-        view={view}
         name={
           board.data?.profiles.find((profile) => profile.id === me.data?.userId)
             ?.name ?? "Mi cuenta"
@@ -241,12 +235,8 @@ export function BoardPage() {
           <div className="heading-text">
             <h1>{VIEWS[view]!.title}</h1>
             <p>
-              {view !== "history" && (
-                <>
-                  {board.data ? visible.length : "—"} tarjetas
-                  {hidden > 0 && ` de ${board.data!.cards.length}`} ·{" "}
-                </>
-              )}
+              {board.data ? visible.length : "—"} tarjetas
+              {hidden > 0 && ` de ${board.data!.cards.length}`} ·{" "}
               {VIEWS[view]!.hint}
             </p>
           </div>
@@ -298,7 +288,7 @@ export function BoardPage() {
             {isBoard ? "Ver archivadas" : "Volver al tablero"}
           </Link>
         </div>
-        {board.data && view !== "history" && (
+        {board.data && (
           <Filters
             filterable={filterable}
             profiles={board.data.profiles}
@@ -308,9 +298,7 @@ export function BoardPage() {
         )}
         {board.error && <p role="alert">{errorMessage(board.error)}</p>}
         {board.data &&
-          (view === "history" ? (
-            <History profiles={board.data.profiles} cards={board.data.cards} />
-          ) : view === "week" ? (
+          (view === "week" ? (
             <Board
               data={{ ...board.data, cards: visible }}
               open={open}

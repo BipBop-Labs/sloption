@@ -3,7 +3,7 @@ import { parse } from "csv-parse/sync";
 import { createHash } from "node:crypto";
 import { posix } from "node:path";
 import { writeFile } from "node:fs/promises";
-import type { Card, Field, Profile } from "../src/backend/core/model";
+import type { Card, Field, Profile } from "../src/backend/domains/kernel";
 const paths = process.argv.slice(2).filter((path) => !path.startsWith("--"));
 const dryRun = process.argv.includes("--dry-run");
 if (!paths.length) throw new Error("Pass one or more Notion export ZIP paths");
@@ -123,7 +123,7 @@ for (const definition of fieldDefinitions)
   }
 const url = process.env.SLOPTION_URL ?? "http://localhost:5173";
 async function invoke(name: string, input: unknown) {
-  const response = await fetch(`${url}/api/actions/${name}`, {
+  const response = await fetch(`${url}/api/${name.replace(".", "/")}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -180,7 +180,7 @@ for (const [index, row] of rows.entries()) {
       }
       if (!dryRun && !uploaded.has(target)) {
         const extension = target.split(".").at(-1)!.toLowerCase();
-        const response = await invoke("asset.create", {
+        const response = await invoke("assets.create", {
           name: posix.basename(target),
           mime:
             extension === "jpg" || extension === "jpeg"
@@ -241,7 +241,7 @@ console.log(JSON.stringify(report, null, 2));
 if (!dryRun)
   console.log(
     JSON.stringify(
-      await invoke("import.apply", {
+      await invoke("imports.apply", {
         cards,
         profiles,
         fields: fieldDefinitions.map((definition) => definition.field),

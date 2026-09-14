@@ -3,12 +3,11 @@ import {
   boolean,
   text,
   jsonb,
-  bigserial,
   integer,
   timestamp,
   primaryKey,
 } from "drizzle-orm/pg-core";
-import type { ActionEvent } from "../../core/actions";
+import type { ActionEvent } from "../../lib/endpoint";
 
 export const records = pgTable(
   "records",
@@ -19,13 +18,10 @@ export const records = pgTable(
   },
   (table) => [primaryKey({ columns: [table.collection, table.id] })],
 );
-export const events = pgTable("events", {
-  sequence: bigserial("sequence", { mode: "number" }).primaryKey(),
-  payload: jsonb("payload").$type<ActionEvent>().notNull(),
-});
+/** Outbox de webhooks. No hay historial: el evento vive acá solo hasta entregarse. */
 export const deliveries = pgTable("deliveries", {
   id: text("id").primaryKey(),
-  eventSequence: integer("event_sequence").notNull(),
+  payload: jsonb("payload").$type<ActionEvent>().notNull(),
   webhookId: text("webhook_id").notNull(),
   attempts: integer("attempts").notNull().default(0),
   nextAttempt: timestamp("next_attempt", { withTimezone: true })

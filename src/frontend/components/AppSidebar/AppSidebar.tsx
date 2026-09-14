@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import type { Role } from "@/backend/core/model";
-import type { BoardSearch } from "@/frontend/lib/filters";
+import type { Role } from "@/backend/domains/kernel";
 import { Icon, Menu, MenuItem, Sidebar, SidebarUser } from "@/frontend/ui";
 
 const ROLES: Record<Role, string> = {
@@ -8,12 +7,10 @@ const ROLES: Record<Role, string> = {
   member: "Miembro",
 };
 
-/** La navegación de la aplicación. Dos destinos y la cuenta abajo: el tablero
- *  con sus vistas es uno solo, y el historial no es una vista de tarjetas. */
+/** La navegación de la aplicación: el tablero, con sus vistas, y la cuenta abajo. */
 export function AppSidebar({
   open,
   onOpenChange,
-  view,
   name,
   role,
   onSettings,
@@ -21,7 +18,6 @@ export function AppSidebar({
 }: {
   open: boolean;
   onOpenChange(open: boolean): void;
-  view: string;
   name: string;
   role: Role;
   onSettings(): void;
@@ -61,26 +57,9 @@ export function AppSidebar({
         </Menu>
       }
     >
-      <Link
-        to="/"
-        // Volver al tablero desde el historial cae en la semana; si ya estabas
-        // en una vista de tarjetas, te deja donde estabas.
-        search={(previous: BoardSearch) => ({
-          ...previous,
-          view: previous.view === "history" ? "week" : previous.view,
-        })}
-        aria-current={view === "history" ? undefined : "page"}
-      >
+      <Link to="/" search={{ view: "week" }} aria-current="page">
         <Icon name="board" />
         <span className="sidebar-label">Tablero</span>
-      </Link>
-      <Link
-        to="/"
-        search={(previous: BoardSearch) => ({ ...previous, view: "history" })}
-        aria-current={view === "history" ? "page" : undefined}
-      >
-        <Icon name="history" />
-        <span className="sidebar-label">Historial de eventos</span>
       </Link>
     </Sidebar>
   );

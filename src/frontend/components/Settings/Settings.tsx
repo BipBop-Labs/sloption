@@ -1,7 +1,7 @@
 import "./Settings.css";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Actor } from "@/backend/core/actions";
+import type { Actor } from "@/backend/lib/endpoint";
 import { action, errorMessage, refresh, type BoardData } from "@/frontend/lib/api";
 import {
   Button,
@@ -12,7 +12,7 @@ import {
   Toast,
   type PanelSection,
 } from "@/frontend/ui";
-import type { Field, Key, Webhook } from "@/backend/core/model";
+import type { Field, Key, Webhook } from "@/backend/domains/kernel";
 export default function Settings({
   actor,
   board,
@@ -43,16 +43,16 @@ export default function Settings({
   }
   const keys = useQuery({
     queryKey: ["settings", "keys"],
-    queryFn: () => action<Omit<Key, "digest">[]>("key.list"),
+    queryFn: () => action<Omit<Key, "digest">[]>("keys.list"),
   });
   const hooks = useQuery({
     queryKey: ["settings", "hooks"],
-    queryFn: () => action<Omit<Webhook, "secret">[]>("webhook.list"),
+    queryFn: () => action<Omit<Webhook, "secret">[]>("webhooks.list"),
     enabled: actor.role === "admin",
   });
   const catalog = useQuery({
     queryKey: ["settings", "catalog"],
-    queryFn: () => action<{ name: string; event: string }[]>("catalog.read"),
+    queryFn: () => action<{ events: string[] }>("catalog.read"),
   });
   async function perform(name: string, input: unknown) {
     try {
@@ -103,13 +103,13 @@ export default function Settings({
             <section>
               <h3>Mis agentes y API keys</h3>
               <p>
-                Cada clave actúa con tus permisos. La auditoría registra al
+                Cada clave actúa con tus permisos. Sus eventos indican al
                 agente y a ti.
               </p>
               <form
                 onSubmit={async (event) => {
                   event.preventDefault();
-                  const response = await perform("key.create", {
+                  const response = await perform("keys.create", {
                     name: new FormData(event.currentTarget).get("name"),
                   });
                   if (response)
@@ -134,7 +134,7 @@ export default function Settings({
                     <Button
                       variant="danger"
                       onClick={() => {
-                        void perform("key.revoke", { id: key.id });
+                        void perform("keys.revoke", { id: key.id });
                       }}
                     >
                       Revocar
@@ -152,7 +152,7 @@ export default function Settings({
                 onSubmit={async (event) => {
                   event.preventDefault();
                   const data = new FormData(event.currentTarget);
-                  const response = await perform("invitation.create", {
+                  const response = await perform("invitations.create", {
                     email: data.get("email"),
                     profileId: data.get("profile") || null,
                     role: data.get("role"),
@@ -214,7 +214,7 @@ export default function Settings({
                       label={`Rol de ${profile.name}`}
                       value={profile.role}
                       onChange={(value) => {
-                        void perform("profile.update", {
+                        void perform("profiles.update", {
                           id: profile.id,
                           role: value,
                         });
@@ -235,7 +235,7 @@ export default function Settings({
                 onSubmit={async (event) => {
                   event.preventDefault();
                   const data = new FormData(event.currentTarget);
-                  const response = await perform("webhook.create", {
+                  const response = await perform("webhooks.create", {
                     url: data.get("url"),
                     events: data.getAll("events"),
                     enabled: true,
@@ -258,9 +258,9 @@ export default function Settings({
                     name="events"
                     multiple
                     options={
-                      catalog.data?.map((item) => ({
-                        id: item.event,
-                        label: item.name,
+                      catalog.data?.events.map((event) => ({
+                        id: event,
+                        label: event,
                       })) ?? []
                     }
                   />
@@ -272,7 +272,7 @@ export default function Settings({
                   <span>{hook.url}</span>
                   <button
                     onClick={() => {
-                      void perform("webhook.update", {
+                      void perform("webhooks.update", {
                         ...hook,
                         enabled: !hook.enabled,
                       });
@@ -283,7 +283,7 @@ export default function Settings({
                   <Button
                     variant="danger"
                     onClick={() => {
-                      void perform("webhook.remove", { id: hook.id });
+                      void perform("webhooks.remove", { id: hook.id });
                     }}
                   >
                     Eliminar

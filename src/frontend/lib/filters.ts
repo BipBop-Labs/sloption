@@ -1,4 +1,4 @@
-import type { Card, Field } from "@/backend/core/model";
+import type { Card, Field } from "@/backend/domains/kernel";
 
 /** Claves propias del tablero. Todo lo demás en la URL es un filtro por campo,
  *  así queda `?assignees=ana,beto&priority=alta` y no un blob JSON. */

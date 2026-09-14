@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import type { Card, Field, Profile, Board } from "@/backend/core/model";
+import type { Card, Field, Profile, Board } from "@/backend/domains/kernel";
 export interface BoardData {
   board: Board;
   fields: Field[];
@@ -11,6 +11,7 @@ export const queryClient = new QueryClient({
     queries: { staleTime: 30_000, retry: false, refetchOnWindowFocus: true },
   },
 });
+/** Por kind: el código concreto del dominio (STALE_VERSION…) no cambia el mensaje. */
 const messages: Record<string, string> = {
   UNAUTHENTICATED: "Inicia sesión para continuar.",
   FORBIDDEN: "No tienes permiso para hacer esto.",
@@ -31,29 +32,29 @@ export async function request<T>(path: string, input?: unknown): Promise<T> {
     throw new Error(
       response.status === 429
         ? "Demasiados intentos. Espera un minuto y vuelve a intentar."
-        : (messages[data.error?.code ?? data.code] ??
+        : (messages[data.error?.kind ?? data.code] ??
             (response.status === 401
               ? "Correo o contraseña incorrectos."
               : "No pudimos guardar. Inténtalo otra vez.")),
     );
   return data as T;
 }
+/** `cards.move` es `POST /api/cards/move`: la ruta por defecto de todo endpoint. */
 export function action<T = unknown>(name: string, input: unknown = {}) {
-  return request<T>(`/api/actions/${name}`, input);
+  return request<T>(`/api/${name.replace(".", "/")}`, input);
 }
 export const boardQuery = (view: string) => ({
   queryKey: ["board", view],
-  queryFn: () => action<BoardData>("board.read", { view }),
+  queryFn: () => action<BoardData>("boards.read", { view }),
 });
 export const cardQuery = (id: string) => ({
   queryKey: ["card", id],
-  queryFn: () => action<Card>("card.read", { id }),
+  queryFn: () => action<Card>("cards.read", { id }),
 });
 export function refresh() {
   void queryClient.invalidateQueries({ queryKey: ["board"] });
   void queryClient.invalidateQueries({ queryKey: ["card"] });
   void queryClient.invalidateQueries({ queryKey: ["settings"] });
-  void queryClient.invalidateQueries({ queryKey: ["history"] });
 }
 export function errorMessage(error: unknown) {
   return error instanceof Error

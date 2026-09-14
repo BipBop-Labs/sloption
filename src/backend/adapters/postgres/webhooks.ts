@@ -1,7 +1,11 @@
 import { createHmac } from "node:crypto";
 import type { Pool } from "pg";
 
-/** Durable outbox. Recipients deduplicate using X-Sloption-Event-Id. */
+/**
+ * Durable outbox. Recipients deduplicate using X-Sloption-Event-Id.
+ * Solo guarda lo pendiente: lo entregado se borra y lo que falló diez veces
+ * queda como `failed` para diagnosticar.
+ */
 export function startWebhookWorker(pool: Pool) {
   let busy = false;
   const timer = setInterval(async () => {
@@ -26,18 +30,11 @@ export function startWebhookWorker(pool: Pool) {
         )
       ).rows[0]?.payload;
       if (!hook?.enabled) {
-        await client.query(
-          "update deliveries set status='cancelled' where id=$1",
-          [delivery.id],
-        );
+        await client.query("delete from deliveries where id=$1", [delivery.id]);
         await client.query("COMMIT");
         return;
       }
-      const event = (
-        await client.query("select payload from events where sequence=$1", [
-          delivery.event_sequence,
-        ])
-      ).rows[0].payload;
+      const event = delivery.payload;
       const body = JSON.stringify(event);
       const timestamp = String(Math.floor(Date.now() / 1000));
       const signature = createHmac("sha256", hook.secret)
@@ -65,16 +62,19 @@ export function startWebhookWorker(pool: Pool) {
         message = error instanceof Error ? error.message : "Delivery failed";
       }
       const attempts = delivery.attempts + 1;
-      await client.query(
-        "update deliveries set attempts=$2,status=$3,last_error=$4,next_attempt=now()+($5::text || ' seconds')::interval where id=$1",
-        [
-          delivery.id,
-          attempts,
-          success ? "delivered" : attempts >= 10 ? "failed" : "pending",
-          success ? null : message.slice(0, 500),
-          Math.min(3600, 2 ** attempts),
-        ],
-      );
+      if (success)
+        await client.query("delete from deliveries where id=$1", [delivery.id]);
+      else
+        await client.query(
+          "update deliveries set attempts=$2,status=$3,last_error=$4,next_attempt=now()+($5::text || ' seconds')::interval where id=$1",
+          [
+            delivery.id,
+            attempts,
+            attempts >= 10 ? "failed" : "pending",
+            message.slice(0, 500),
+            Math.min(3600, 2 ** attempts),
+          ],
+        );
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK").catch(() => {});

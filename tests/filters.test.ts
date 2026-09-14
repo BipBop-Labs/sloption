@@ -5,7 +5,7 @@ import {
   filterableFields,
   matchesFilters,
 } from "@/frontend/lib/filters";
-import type { Card, Field } from "../src/backend/core/model";
+import type { Card, Field } from "../src/backend/domains/kernel";
 
 const fields: Field[] = [
   {

@@ -1,6 +1,6 @@
 import "./Filters.css";
 import { useNavigate } from "@tanstack/react-router";
-import type { Field, Profile } from "@/backend/core/model";
+import type { Field, Profile } from "@/backend/domains/kernel";
 import { activeFilter, EMPTY, type BoardSearch } from "@/frontend/lib/filters";
 import { DropdownSelect } from "@/frontend/ui";
 

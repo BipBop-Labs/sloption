@@ -16,7 +16,7 @@ const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   validateSearch: (search: Record<string, unknown>): BoardSearch => ({
-    view: ["week", "all", "archived", "history"].includes(String(search.view))
+    view: ["week", "all", "archived"].includes(String(search.view))
       ? String(search.view)
       : "week",
     card: typeof search.card === "string" ? search.card : undefined,

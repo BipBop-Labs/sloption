@@ -1,6 +1,6 @@
 import "./CardTile.css";
 import React, { memo, useRef } from "react";
-import type { Card, Field, Profile } from "@/backend/core/model";
+import type { Card, Field, Profile } from "@/backend/domains/kernel";
 import { cardQuery, queryClient } from "@/frontend/lib/api";
 import { captureDrag, dropTargetAt, type DropTarget } from "@/frontend/lib/drag";
 import type { Update } from "@/frontend/lib/update";
@@ -129,14 +129,14 @@ export const CardTile = memo(function CardTile({
     const target = state.drop ?? null;
     drop(state.active);
     if (state.active && state.moved) {
-      if (target) void update("card.move", { id: card.id, ...target });
+      if (target) void update("cards.move", { id: card.id, ...target });
     } else if (
       state.touch &&
       Math.abs(event.clientX - state.x) > 70 &&
       Math.abs(event.clientY - state.y) < 40
     )
       void update(
-        "card.week",
+        "cards.week",
         { id: card.id, weekly: !card.weekly },
         { weekly: !card.weekly },
       );
@@ -173,7 +173,7 @@ export const CardTile = memo(function CardTile({
               event.key === "ArrowUp"
                 ? tiles[index - 1]?.dataset.cardId
                 : tiles[index + 2]?.dataset.cardId;
-            void update("card.move", {
+            void update("cards.move", {
               id: card.id,
               optionId: column?.dataset.option || null,
               beforeId: beforeId ?? null,
@@ -184,7 +184,7 @@ export const CardTile = memo(function CardTile({
                 ? column?.previousElementSibling
                 : column?.nextElementSibling;
             if (target instanceof HTMLElement)
-              void update("card.move", {
+              void update("cards.move", {
                 id: card.id,
                 optionId: target.dataset.option || null,
               });

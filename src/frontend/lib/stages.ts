@@ -1,4 +1,4 @@
-import type { Field } from "@/backend/core/model";
+import type { Field } from "@/backend/domains/kernel";
 
 /** Devuelve las etapas con `id` movida justo antes de `beforeId`; con un
  *  destino que no existe (por ejemplo "", la columna sin estado), al final.

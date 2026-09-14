@@ -19,12 +19,13 @@ un proyecto aparte, se instala desde acá.
 | Gestor de paquetes | **pnpm** (no npm) |
 | Despliegue | **Coolify** + Docker Compose |
 
-## Arquitectura elegida: hexagonal (ports & adapters)
+## Arquitectura elegida: hexagonal, cortada por dominio
 
-El núcleo contiene las acciones y las reglas de autorización. No importa React, Hono,
-BetterAuth ni Drizzle. Los adaptadores traducen protocolos y almacenamiento; el
-composition root conecta sus implementaciones. La CLI usa la API HTTP, que invoca
-exactamente el mismo catálogo que la web.
+Ports & adapters, con el backend dividido en dominios verticales: auth, boards, cards,
+fields, webhooks, assets e imports. Los dominios no importan React, Hono, BetterAuth ni
+Drizzle. Los adaptadores traducen protocolos y almacenamiento; el composition root
+conecta sus implementaciones. La CLI usa la API HTTP, que invoca exactamente el mismo
+catálogo que la web.
 
 Se evaluaron arquitectura por capas centrada en el framework y arquitectura hexagonal.
 Elegimos la segunda porque permite probar los flujos sin servidor ni navegador y evita
@@ -33,13 +34,69 @@ No se agregan agregados DDD, buses ni repositorios por entidad sin una necesidad
 La skill de Ousterhout orienta interfaces pequeñas que encapsulan transacciones,
 validación y auditoría, evitando capas que solo reenvían métodos.
 
-**Quién es el que llama lo decide el núcleo.** `createIdentityService` expone
-`fromApiKey(token)` y `fromSession(authUserId)`: ahí viven las reglas de que una key
-revocada no autentica, que una API key actúa como su dueño anotando al agente aparte
-para la auditoría, y que el rol sale del perfil y no del usuario de BetterAuth. El
-adaptador solo extrae la credencial del transporte que conoce —cabecera `Authorization`
-o cookie— y pregunta. Antes esto estaba en `src/server/context.ts`, o sea reglas de
-negocio en el composition root, y repartidas entre tres módulos.
+### El wrapper: `src/backend/lib/`
+
+Cada endpoint se declara una vez, con `defineEndpoint` dentro de un `defineRouter`: doc,
+acceso (`public`, `member` o `admin`), input y output zod, errores, `scope` opcional y su
+evento, o `null` si no emite. De esa definición salen:
+
+- la acción `cards.move` y el evento `cards.move.v1`;
+- la ruta HTTP, por defecto `POST /api/cards/move`, o la que declare `http`;
+- el comando `sloption cards move`;
+- su entrada en `catalog.read`, con JSON Schema del input, el output y el payload.
+
+El runner (`createCatalog`, en `lib/catalog.ts`) corre igual cada llamada, venga de donde
+venga: autentica con el puerto `Authenticator`, autoriza por rol, valida el input, abre la
+transacción, carga y autoriza el recurso de `scope`, llama al orquestador, valida output y
+payload, y publica el evento en la misma transacción.
+
+**La CLI llama a la API HTTP**, como `gh` o `stripe`: un solo lugar autentica, autoriza y
+emite, y la CLI funciona desde cualquier máquina con una API key. Saca las rutas de
+`catalog.read`, así que un endpoint nuevo aparece en la CLI sin tocarla.
+
+### Un dominio: router, orquestador, servicios
+
+`src/backend/domains/<dominio>/`:
+
+- `router.ts`: solo definiciones y su doc. Sin lógica.
+- `orchestrator.ts`: una función por endpoint; `implement` obliga a implementarlas
+  todas. Devuelve el output y el payload del evento.
+- `services.ts`: operaciones reutilizables que reciben la transacción.
+- `model.ts`, `errors.ts` y, si hace falta, `events.ts`.
+
+`domains/kernel.ts` es lo compartido: el mapa de colecciones, la transacción y las
+dependencias. Reglas, verificadas por `tests/architecture.test.ts`:
+
+- Un orquestador usa servicios propios y de otros dominios.
+- Los servicios se consumen entre dominios; los orquestadores no. Solo `server/`
+  importa orquestadores.
+- `lib/` no conoce ningún dominio.
+
+### Errores
+
+Cada dominio declara los suyos con un código propio (`STALE_VERSION`) y un `kind` de
+`lib/errors.ts`, que decide el status HTTP y el exit code de la CLI. La respuesta es
+`{error: {code, kind, message}}`. El orquestador lanza con `fail(code)`, tipado con los
+errores de su endpoint. Los del runner (UNAUTHENTICATED, FORBIDDEN, INVALID_INPUT y el
+NOT_FOUND de `scope`) no se declaran.
+
+### Autenticación y autorización
+
+**auth es un dominio**: sesión, API keys, invitaciones, perfiles y roles. Implementa el
+puerto `Authenticator` de `lib/`. El adaptador solo extrae la credencial —cabecera
+`Authorization` o cookie— y el runner pregunta. En auth viven las reglas de que una key
+revocada no autentica, que una API key actúa como su dueño anotando al agente aparte, y
+que el rol sale del perfil y no del usuario de BetterAuth.
+
+**Permisos que dependen del recurso:** el endpoint declara `scope` (`load`, `from`,
+`allow`). El runner carga el recurso dentro de la transacción, responde NOT_FOUND o
+FORBIDDEN y se lo pasa al orquestador, sin una segunda lectura. Es la forma que toma
+después el acceso por tablero del roadmap (ESTADO.md); el actor ya lleva `orgId`.
+
+Login y logout siguen en BetterAuth (`/api/auth/*`), fuera del catálogo, para conservar
+su rate limit y la cookie HttpOnly. Emiten `auth.login.v1` y `auth.logout.v1` con IP y
+user agent, suscribibles por webhook. La IP es el último valor de `X-Forwarded-For`, el
+que agrega el proxy de Coolify; el primero lo escribe el cliente.
 
 Fuente: [artículo original de Cockburn](https://alistair.cockburn.us/hexagonal-architecture).
 
@@ -53,29 +110,31 @@ Router y Query conserva ese límite sin dos servidores Start ni SSR que el table
 privado no necesita. En producción Hono sirve también los archivos compilados de Vite:
 un monolito, un proceso de aplicación y una base de datos.
 
-La lógica no vive en handlers ni server functions: vive en el núcleo.
+La lógica no vive en handlers ni server functions: vive en los orquestadores y servicios
+de cada dominio. El adaptador HTTP monta una ruta por endpoint del catálogo.
 [Adaptador Node de Hono](https://hono.dev/docs/getting-started/nodejs).
 
 ## Persistencia y tiempo real
 
-PostgreSQL + Drizzle. Cada acción completada y su evento se persisten en la misma
-transacción. Los eventos tienen secuencia durable para reconectar y consultar historial.
-Las notificaciones de PostgreSQL despiertan el streaming SSE; no son el almacenamiento
-de eventos. Las lecturas auditadas no invalidan el tablero, evitando un ciclo infinito
-lectura → evento → recarga. Los secretos nunca forman parte de los payloads de auditoría.
+PostgreSQL + Drizzle. Cada endpoint y su evento se confirman en la misma transacción.
 
-El historial filtra las lecturas **por el nombre de la acción** (`.read` y `.list`, la
-convención de todo el catálogo), no por el `changed` del evento. `changed` significa "el
-tablero debe refrescarse", que no es lo mismo que "escribió algo": `key.revoke`, los
-webhooks y `invitation.create` escriben sin tocar el tablero, y filtrando por `changed`
-quedaban escondidos de la auditoría justo los eventos de seguridad. El campo del evento
-sigue llamándose `changed` porque el esquema `.v1` está congelado; el parámetro de
-`register` se llama `refreshesBoard`, que es lo que hace.
+**No hay historial de eventos.** Un evento sale por dos lados y no se guarda en ninguno:
+
+- **Webhooks.** Por cada suscriptor se encola una entrega con el payload en
+  `deliveries`: outbox durable, firma HMAC y reintentos. Entregada se borra; después de
+  diez fallos queda como `failed`. Quien necesite guardar eventos suscribe un webhook a
+  otro servicio.
+- **Navegadores.** Si el endpoint declara `refreshesBoard`, un `pg_notify` avisa por SSE
+  y el cliente recarga. No hay cursor: al conectar o reconectar llega `ready` y el
+  cliente recarga todo. Las lecturas emiten evento pero no refrescan el tablero, así no
+  hay ciclo lectura → evento → recarga.
+
+Los secretos nunca forman parte de los payloads.
 
 Se evaluó [Electric Sync](https://electric.ax/docs/sync/): sincroniza lecturas desde
 PostgreSQL, exige un servicio adicional y replicación lógica. Para un solo tablero
-compartido se elige SSE con recuperación desde eventos persistidos: menos infraestructura,
-las mismas escrituras autorizadas. [Semántica de NOTIFY](https://www.postgresql.org/docs/current/sql-notify.html).
+compartido se elige SSE con recarga al reconectar: menos infraestructura, las mismas
+escrituras autorizadas. [Semántica de NOTIFY](https://www.postgresql.org/docs/current/sql-notify.html).
 
 Edición simultánea: Yjs encapsulado detrás de un puerto de documentos.
 Cada actualización debe invocar una acción autenticada, persistir antes de difundirse y
@@ -87,22 +146,25 @@ sesiones de navegador. El estado Yjs y su representación Markdown se confirman 
 
 ### Estructura de carpetas
 
-- `src/core/`: contratos, dominio, acciones, autorización, identidad y puertos.
-- `src/adapters/postgres/`: esquema Drizzle, migraciones, transacciones y el worker
-  del outbox de webhooks. Es lo único que conoce la tabla `records` y su JSONB.
-- `src/adapters/http/`: Hono, extracción de credenciales del transporte y SSE.
-- `src/adapters/cli/`: cliente del catálogo HTTP.
-- `src/adapters/documents/`: conversión Markdown y colaboración.
-- `src/web/`: el entry (`main.tsx`) y `styles.css`. Nada más suelto acá.
-- `src/web/routes/`: el árbol de rutas (`router.tsx`) y las páginas. Una página es lo que
-  el router monta y lo que la URL nombra.
-- `src/web/components/`: componentes con lógica. Conocen el dominio, invocan acciones y
-  consumen `ui/`.
-- `src/web/ui/`: primitivas de UI, tontas y sin dominio (ver abajo).
-- `src/web/lib/`: lógica de vista que no es un componente — el cliente HTTP y lo demás
-  (`api.ts`, `update.ts`, `filters.ts`, `stages.ts`, `drag.ts`).
-- `src/server/`: configuración y composición de adaptadores. Solo cableado: ninguna
-  regla vive acá.
+- `src/backend/lib/`: el wrapper (`endpoint.ts`, `catalog.ts`), los puertos y los kinds
+  de error. Sin dominio.
+- `src/backend/domains/`: un directorio por dominio y `kernel.ts`.
+- `src/backend/adapters/postgres/`: esquema Drizzle, migraciones, transacciones y el
+  worker del outbox de webhooks. Es lo único que conoce la tabla `records` y su JSONB.
+- `src/backend/adapters/http/`: Hono. Una ruta por endpoint, extracción de la credencial,
+  SSE y el login de BetterAuth.
+- `src/backend/adapters/cli/`: cliente HTTP; saca las rutas de `catalog.read`.
+- `src/backend/adapters/documents/`: conversión Markdown y colaboración.
+- `src/backend/server/`: configuración y composición. Solo cableado: ninguna regla vive
+  acá.
+- `src/frontend/`: el entry (`main.tsx`) y `styles.css`. Nada más suelto acá.
+- `src/frontend/routes/`: el árbol de rutas (`router.tsx`) y las páginas. Una página es
+  lo que el router monta y lo que la URL nombra.
+- `src/frontend/components/`: componentes con lógica. Conocen el dominio, invocan
+  acciones y consumen `ui/`.
+- `src/frontend/ui/`: primitivas de UI, tontas y sin dominio (ver abajo).
+- `src/frontend/lib/`: lógica de vista que no es un componente — el cliente HTTP y lo
+  demás (`api.ts`, `update.ts`, `filters.ts`, `stages.ts`, `drag.ts`).
 - `scripts/`: desarrollo, seed e importación.
 - `tests/`: dominio, integración con PostgreSQL y flujos UI/API/CLI.
 
@@ -132,14 +194,14 @@ de builds de TanStack y con los volúmenes. No vale la pena.
 
 | Capa | Qué vive ahí | Qué no |
 |---|---|---|
-| `src/web/routes/` | `router.tsx` y las páginas: hoy solo `BoardPage`. | Paneles sin ruta propia. El cajón de la tarjeta, configuración y propiedades los abre un parámetro de búsqueda de esta misma ruta: son componentes. |
-| `src/web/components/` | Componentes con lógica: `Board`, `CardTile`, `CardDialog`, `CardList`, `Filters`, `Login`, `Settings`, `BoardFields`, `AppSidebar`, `History`, `DocumentEditor`. Invocan acciones y arman la predicción optimista. | Markup de un control que ya existe en `ui/`. |
-| `src/web/ui/` | Primitivas: botón, chip, icono, dropdown, avatares, composer, modal, panel, barra lateral, toast, confirmación. | Nada del dominio: sin `Card`, sin `Field`, sin acciones, sin queries. |
-| `src/web/lib/` | Lógica que no es un componente: `api.ts`, `update.ts`, `filters.ts`, `stages.ts`, `drag.ts`. | Nada de JSX. |
+| `src/frontend/routes/` | `router.tsx` y las páginas: hoy solo `BoardPage`. | Paneles sin ruta propia. El cajón de la tarjeta, configuración y propiedades los abre un parámetro de búsqueda de esta misma ruta: son componentes. |
+| `src/frontend/components/` | Componentes con lógica: `Board`, `CardTile`, `CardDialog`, `CardList`, `Filters`, `Login`, `Settings`, `BoardFields`, `AppSidebar`, `DocumentEditor`. Invocan acciones y arman la predicción optimista. | Markup de un control que ya existe en `ui/`. |
+| `src/frontend/ui/` | Primitivas: botón, chip, icono, dropdown, avatares, composer, modal, panel, barra lateral, toast, confirmación. | Nada del dominio: sin `Card`, sin `Field`, sin acciones, sin queries. |
+| `src/frontend/lib/` | Lógica que no es un componente: `api.ts`, `update.ts`, `filters.ts`, `stages.ts`, `drag.ts`. | Nada de JSX. |
 
 **Antes de escribir un control, mirá si ya existe en `ui/` y reusalo.** Si falta, se
-agrega ahí y se exporta desde `src/web/ui/index.ts` — nunca suelto en un componente ni en
-la raíz de `src/web/`.
+agrega ahí y se exporta desde `src/frontend/ui/index.ts` — nunca suelto en un componente
+ni en la raíz de `src/frontend/`.
 
 **Un directorio por componente, con su CSS al lado**, y el archivo se llama como el
 componente: `Button/Button.tsx` exporta `Button` e importa `Button/Button.css`.
@@ -153,8 +215,9 @@ conocen entre sí (`.error`, `.help`, `.sr-only`). Todo lo demás vive en el
 que ambos consumen —la cabecera de diálogo está en `ui/Modal/Modal.css`, no duplicada.
 Además, el CSS de un componente cargado con `lazy()` viaja en su propio chunk.
 
-**Los imports que cruzan de capa usan el alias `@/`** — `@/core/model`, `@/web/lib/api`,
-`@/web/ui`—; dentro de la misma capa, ruta relativa. Está declarado en `tsconfig.json`,
+**Los imports que cruzan de capa usan el alias `@/`** — `@/backend/domains/kernel`,
+`@/frontend/lib/api`, `@/frontend/ui`—; dentro de la misma capa, ruta relativa. El
+frontend importa del backend solo tipos: `import type`. Está declarado en `tsconfig.json`,
 `vite.config.ts` y `vitest.config.ts`.
 
 La regla que las mantiene reusables: **las primitivas son tontas.** No conocen `Card`,
@@ -188,7 +251,8 @@ AGENTS.md vista desde el frontend.
 ## Convenciones
 
 - `pnpm` siempre. Nunca `npm`.
-- Controles de UI: reusar lo de `src/web/ui/`; primitiva tonta, lógica en `components/`.
+- Controles de UI: reusar lo de `src/frontend/ui/`; primitiva tonta, lógica en
+  `components/`.
 - Esquema de base de datos en código, con Drizzle como fuente de verdad.
 - Esquemas de eventos versionados y explícitos (ver [SPEC.md](SPEC.md)).
 
@@ -198,11 +262,8 @@ El adaptador almacena entidades tipadas en registros JSONB identificados por col
 e ID; Drizzle define la tabla y las migraciones, incluidas las tablas de BetterAuth.
 Las propiedades configurables no requieren una migración SQL por campo. El núcleo
 valida tipos y referencias antes de escribir. Para un único tablero, una exclusión
-transaccional de PostgreSQL ordena acciones y eventos. Si el volumen o concurrencia
-crece, medir ese límite antes de dividir bloqueos o normalizar consultas.
+transaccional de PostgreSQL ordena las escrituras. Si el volumen o concurrencia crece,
+medir ese límite antes de dividir bloqueos o normalizar consultas.
 
 Invitación, cuenta y perfil se crean en una misma transacción usando BetterAuth con el
 adaptador Drizzle ligado a ella. El seed también es transaccional e idempotente.
-
-La señal SSE usa revisiones para no perder notificaciones recibidas entre leer el
-historial y entrar en espera. El evento durable sigue siendo la fuente de recuperación.
